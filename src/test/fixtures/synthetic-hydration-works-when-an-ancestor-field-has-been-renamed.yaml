@@ -1,0 +1,144 @@
+---
+name: synthetic hydration works when an ancestor field has been renamed
+query: |-
+  query {
+    devOpsRelationships {
+      devOpsNodes {
+        devOpsIssue {
+          id
+        }
+      }
+    }
+  }
+services:
+  IssueService: |
+    schema {
+      query: Query
+    }
+
+    type Issue {
+      id: ID
+    }
+
+    type Query {
+      relationships: RelationshipConnection
+      syntheticIssue: SyntheticIssue
+    }
+
+    type Relationship {
+      issueId: ID
+    }
+
+    type RelationshipConnection {
+      nodes: [Relationship]
+    }
+
+    type SyntheticIssue {
+      issue(id: ID): Issue
+    }
+ndsls:
+  IssueService: |-
+    service IssueService {
+       type DevOpsIssue => renamed from Issue {
+           id: ID
+       }
+       type DevOpsRelationship => renamed from Relationship {
+           devOpsIssue: DevOpsIssue => hydrated from IssueService.syntheticIssue.issue(id: $source.issueId)
+       }
+       type DevOpsRelationshipConnection => renamed from RelationshipConnection {
+           devOpsNodes: [DevOpsRelationship] => renamed from nodes
+       }
+       type SyntheticIssue {
+           devOpsIssue(id: ID): DevOpsIssue => renamed from issue
+       }
+       type Query {
+           devOpsRelationships: DevOpsRelationshipConnection => renamed from relationships
+       }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type DevOpsIssue @renamed(from: "Issue") {
+    id: ID
+  }
+
+  type DevOpsRelationship @renamed(from: "Relationship") {
+    issueId: ID @omitted
+    devOpsIssue: DevOpsIssue @hydrated(from: ["syntheticIssue", "issue"] arguments: [{name: "id" valueFromField: ["issueId"]}] objectId: "id")
+  }
+
+  type DevOpsRelationshipConnection @renamed(from: "RelationshipConnection") {
+    nodes: [Relationship] @omitted
+    devOpsNodes: [DevOpsRelationship] @renamed(from: "nodes")
+  }
+
+  type Query {
+    relationships: RelationshipConnection @omitted
+    devOpsRelationships: DevOpsRelationshipConnection @renamed(from: "relationships")
+  }
+
+  type SyntheticIssue {
+    issue(id: ID): Issue @omitted
+    devOpsIssue(id: ID): DevOpsIssue @renamed(from: "issue")
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_IssueService {
+      syntheticIssue {
+        issue(id: "1") {
+          id
+        }
+      }
+    }
+  call-1: |-
+    query nadel_2_IssueService {
+      relationships {
+        nodes {
+          issueId
+        }
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "relationships" : {
+          "nodes" : [
+            {
+              "issueId" : "1"
+            }
+          ]
+        }
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "syntheticIssue" : {
+          "issue" : {
+            "id" : "1"
+          }
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "devOpsRelationships" : {
+        "devOpsNodes" : [
+          {
+            "devOpsIssue" : {
+              "id" : "1"
+            }
+          }
+        ]
+      }
+    },
+    "extensions" : { }
+  }

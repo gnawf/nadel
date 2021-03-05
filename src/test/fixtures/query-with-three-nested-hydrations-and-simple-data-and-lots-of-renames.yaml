@@ -1,0 +1,307 @@
+---
+name: query with three nested hydrations and simple data and lots of renames
+query: |-
+  query {
+    fooz {
+      fooDetails {
+        fooName
+        fooAge
+        fooContact {
+          fooEmail
+          fooPhone
+        }
+      }
+      bar {
+        barName
+        nestedBar {
+          barName
+          nestedBar {
+            barName
+            barDetails {
+              barAge
+              barContact {
+                barEmail
+                barPhone
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+services:
+  Bar: |
+    schema {
+      query: Query
+    }
+
+    type Bar {
+      barId: ID
+      details: Details
+      name: String
+      nestedBarId: ID
+    }
+
+    type ContactDetails {
+      email: String
+      phone: Int
+    }
+
+    type Details {
+      age: Int
+      contact: ContactDetails
+    }
+
+    type Query {
+      bar: Bar
+      barsById(id: [ID]): [Bar]
+    }
+  Foo: |
+    schema {
+      query: Query
+    }
+
+    type ContactDetails {
+      email: String
+      phone: Int
+    }
+
+    type Details {
+      age: Int
+      contact: ContactDetails
+      name: String
+    }
+
+    type Foo {
+      barId: ID
+      details: Details
+    }
+
+    type Query {
+      foos: [Foo]
+    }
+ndsls:
+  Bar: "service Bar {\n   type Query{\n       ibar: Bar => renamed from bar \n   }\
+    \ \n   type Bar {\n       barId: ID\n       barName: String => renamed from name\n\
+    \       nestedBar: Bar => hydrated from Bar.barsById(id: $source.nestedBarId)\
+    \ object identified by barId\n       barDetails: BarDetails => renamed from details\n\
+    \   }\n   type BarDetails => renamed from Details {\n       barAge: Int => renamed\
+    \ from age\n       barContact: BarContactDetails => renamed from contact\n   }\n\
+    \   type BarContactDetails => renamed from ContactDetails {\n       barEmail:\
+    \ String => renamed from email\n       barPhone: Int => renamed from phone\n \
+    \  }\n}"
+  Foo: "service Foo {\n   type Query{\n       fooz: [Fooz]  => renamed from foos\n\
+    \   } \n   type Fooz => renamed from Foo {\n       fooDetails: FooDetails => renamed\
+    \ from details\n       bar: Bar => hydrated from Bar.barsById(id: $source.barId)\
+    \ object identified by barId, batch size 2\n   }\n   type FooDetails => renamed\
+    \ from Details {\n       fooName: String => renamed from name\n       fooAge:\
+    \ Int => renamed from age\n       fooContact: FooContactDetails => renamed from\
+    \ contact\n   }\n   type FooContactDetails => renamed from ContactDetails {\n\
+    \       fooEmail: String => renamed from email\n       fooPhone: Int => renamed\
+    \ from phone\n   }\n}"
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Bar {
+    details: Details @omitted
+    nestedBarId: ID @omitted
+    name: String @omitted
+    barDetails: BarDetails @renamed(from: "details")
+    barId: ID
+    barName: String @renamed(from: "name")
+    nestedBar: Bar @hydrated(from: ["barsById"] arguments: [{name: "id" valueFromField: ["nestedBarId"]}] objectId: "barId")
+  }
+
+  type BarContactDetails @renamed(from: "ContactDetails") {
+    phone: Int @omitted
+    email: String @omitted
+    barEmail: String @renamed(from: "email")
+    barPhone: Int @renamed(from: "phone")
+  }
+
+  type BarDetails @renamed(from: "Details") {
+    contact: ContactDetails @omitted
+    age: Int @omitted
+    barAge: Int @renamed(from: "age")
+    barContact: BarContactDetails @renamed(from: "contact")
+  }
+
+  type FooContactDetails @renamed(from: "ContactDetails") {
+    phone: Int @omitted
+    email: String @omitted
+    fooEmail: String @renamed(from: "email")
+    fooPhone: Int @renamed(from: "phone")
+  }
+
+  type FooDetails @renamed(from: "Details") {
+    contact: ContactDetails @omitted
+    age: Int @omitted
+    name: String @omitted
+    fooAge: Int @renamed(from: "age")
+    fooContact: FooContactDetails @renamed(from: "contact")
+    fooName: String @renamed(from: "name")
+  }
+
+  type Fooz @renamed(from: "Foo") {
+    barId: ID @omitted
+    details: Details @omitted
+    bar: Bar @hydrated(from: ["barsById"] arguments: [{name: "id" valueFromField: ["barId"]}] objectId: "barId" batchSize: "2")
+    fooDetails: FooDetails @renamed(from: "details")
+  }
+
+  type Query {
+    bar: Bar @omitted
+    foos: [Foo] @omitted
+    fooz: [Fooz] @renamed(from: "foos")
+    ibar: Bar @renamed(from: "bar")
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Bar {
+      barsById(id: ["nestedBar1"]) {
+        name
+        nestedBarId
+        object_identifier__UUID: barId
+      }
+    }
+  call-2: |-
+    query nadel_2_Foo {
+      foos {
+        details {
+          name
+          age
+          contact {
+            email
+            phone
+          }
+        }
+        barId
+      }
+    }
+  call-1: |-
+    query nadel_2_Bar {
+      barsById(id: ["bar1"]) {
+        name
+        nestedBarId
+        object_identifier__UUID: barId
+      }
+    }
+  call-3: |-
+    query nadel_2_Bar {
+      barsById(id: ["nestedBarId456"]) {
+        name
+        details {
+          age
+          contact {
+            email
+            phone
+          }
+        }
+        object_identifier__UUID: barId
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "foos" : [
+          {
+            "details" : {
+              "name" : "smith",
+              "age" : 1,
+              "contact" : {
+                "email" : "test",
+                "phone" : 1
+              }
+            },
+            "barId" : "bar1"
+          }
+        ]
+      },
+      "extensions" : { }
+    }
+  call-2: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "barsById" : [
+          {
+            "object_identifier__UUID" : "nestedBar1",
+            "name" : "NestedBarName1",
+            "nestedBarId" : "nestedBarId456"
+          }
+        ]
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "barsById" : [
+          {
+            "object_identifier__UUID" : "bar1",
+            "name" : "Bar 1",
+            "nestedBarId" : "nestedBar1"
+          }
+        ]
+      },
+      "extensions" : { }
+    }
+  call-3: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "barsById" : [
+          {
+            "object_identifier__UUID" : "nestedBarId456",
+            "name" : "NestedBarName2",
+            "details" : {
+              "age" : 1,
+              "contact" : {
+                "email" : "test",
+                "phone" : 1
+              }
+            }
+          }
+        ]
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "fooz" : [
+        {
+          "fooDetails" : {
+            "fooName" : "smith",
+            "fooAge" : 1,
+            "fooContact" : {
+              "fooEmail" : "test",
+              "fooPhone" : 1
+            }
+          },
+          "bar" : {
+            "barName" : "Bar 1",
+            "nestedBar" : {
+              "barName" : "NestedBarName1",
+              "nestedBar" : {
+                "barName" : "NestedBarName2",
+                "barDetails" : {
+                  "barAge" : 1,
+                  "barContact" : {
+                    "barEmail" : "test",
+                    "barPhone" : 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "extensions" : { }
+  }

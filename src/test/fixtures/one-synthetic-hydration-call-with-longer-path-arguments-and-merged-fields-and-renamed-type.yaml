@@ -1,0 +1,184 @@
+---
+name: one synthetic hydration call with longer path arguments and merged fields and
+  renamed Type
+query: |-
+  query {
+    issues {
+      id
+      authors {
+        name
+        id
+      }
+    }
+  }
+services:
+  UserService: |
+    schema {
+      query: Query
+    }
+
+    type Query {
+      usersQuery: UserQuery
+    }
+
+    type User {
+      id: ID
+      name: String
+    }
+
+    type UserQuery {
+      usersByIds(id: [ID]): [User]
+    }
+  Issues: |
+    schema {
+      query: Query
+    }
+
+    type Issue {
+      authorIds: [ID]
+      authors: [IssueUser]
+      id: ID
+    }
+
+    type IssueUser {
+      authorId: ID
+    }
+
+    type Query {
+      issues: [Issue]
+    }
+ndsls:
+  UserService: |-
+    service UserService {
+        type Query {
+            usersQuery: RenamedUserQuery
+        }
+        type RenamedUserQuery => renamed from UserQuery {
+           usersByIds(id: [ID]): [RenamedUser]
+        }
+        type RenamedUser => renamed from User {
+            id: ID
+            name: String
+        }
+    }
+  Issues: |-
+    service Issues {
+        type Query {
+            issues: [Issue]
+        }
+        type Issue {
+            id: ID
+            authors: [RenamedUser] => hydrated from UserService.usersQuery.usersByIds(id: $source.authors.authorId) object identified by id, batch size 2
+        }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Issue {
+    authors: [IssueUser] @omitted
+    authors: [RenamedUser] @hydrated(from: ["usersQuery", "usersByIds"] arguments: [{name: "id" valueFromField: ["authors", "authorId"]}] objectId: "id" batchSize: "2")
+    id: ID
+  }
+
+  type Query {
+    issues: [Issue]
+    usersQuery: RenamedUserQuery
+  }
+
+  type RenamedUser @renamed(from: "User") {
+    id: ID
+    name: String
+  }
+
+  type RenamedUserQuery @renamed(from: "UserQuery") {
+    usersByIds(id: [ID]): [RenamedUser]
+  }
+
+  type IssueUser {
+    authorId: ID
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_UserService {
+      usersQuery {
+        usersByIds(id: ["USER-1", "USER-2"]) {
+          name
+          id
+          object_identifier__UUID: id
+        }
+      }
+    }
+  call-1: |-
+    query nadel_2_Issues {
+      issues {
+        id
+        authors {
+          authorId
+        }
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "issues" : [
+          {
+            "id" : "ISSUE-1",
+            "authors" : [
+              {
+                "authorId" : "USER-1"
+              },
+              {
+                "authorId" : "USER-2"
+              }
+            ]
+          }
+        ]
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "usersQuery" : {
+          "usersByIds" : [
+            {
+              "id" : "USER-1",
+              "name" : "User 1",
+              "object_identifier__UUID" : "USER-1"
+            },
+            {
+              "id" : "USER-2",
+              "name" : "User 2",
+              "object_identifier__UUID" : "USER-2"
+            }
+          ]
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "issues" : [
+        {
+          "id" : "ISSUE-1",
+          "authors" : [
+            {
+              "name" : "User 1",
+              "id" : "USER-1"
+            },
+            {
+              "name" : "User 2",
+              "id" : "USER-2"
+            }
+          ]
+        }
+      ]
+    },
+    "extensions" : { }
+  }

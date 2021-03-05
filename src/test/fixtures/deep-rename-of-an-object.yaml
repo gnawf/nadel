@@ -1,0 +1,138 @@
+---
+name: deep rename of an object
+query: |-
+  query {
+    issues {
+      id
+      authorName {
+        firstName
+        lastName
+      }
+    }
+  }
+services:
+  Issues: |
+    schema {
+      query: Query
+    }
+
+    type AuthorDetail {
+      name: Name
+    }
+
+    type Issue {
+      authorDetails: AuthorDetail
+      id: ID
+    }
+
+    type Name {
+      fName: String
+      lName: String
+    }
+
+    type Query {
+      issues: [Issue]
+    }
+ndsls:
+  Issues: |-
+    service Issues {
+        type Query {
+            issues: [Issue]
+        }
+        type Issue {
+            id: ID
+            authorName: Name => renamed from authorDetails.name
+        }
+        type Name {
+            firstName: String => renamed from fName
+            lastName: String => renamed from lName
+        }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Issue {
+    authorDetails: AuthorDetail @omitted
+    authorName: Name @pull(from: ["authorDetails", "name"])
+    id: ID
+  }
+
+  type Name {
+    lName: String @omitted
+    fName: String @omitted
+    firstName: String @renamed(from: "fName")
+    lastName: String @renamed(from: "lName")
+  }
+
+  type Query {
+    issues: [Issue]
+  }
+
+  type AuthorDetail {
+    name: Name
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Issues {
+      issues {
+        id
+        authorDetails {
+          name {
+            fName
+            lName
+          }
+        }
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "issues" : [
+          {
+            "id" : "ISSUE-1",
+            "authorDetails" : {
+              "name" : {
+                "fName" : "George",
+                "lName" : "Smith"
+              }
+            }
+          },
+          {
+            "id" : "ISSUE-2",
+            "authorDetails" : {
+              "name" : {
+                "fName" : "Elizabeth",
+                "lName" : "Windsor"
+              }
+            }
+          }
+        ]
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "issues" : [
+        {
+          "id" : "ISSUE-1",
+          "authorName" : {
+            "firstName" : "George",
+            "lastName" : "Smith"
+          }
+        },
+        {
+          "id" : "ISSUE-2",
+          "authorName" : {
+            "firstName" : "Elizabeth",
+            "lastName" : "Windsor"
+          }
+        }
+      ]
+    },
+    "extensions" : { }
+  }

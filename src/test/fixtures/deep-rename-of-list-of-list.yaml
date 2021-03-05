@@ -1,0 +1,103 @@
+---
+name: deep rename of list of list
+query: |-
+  query {
+    details {
+      labels
+    }
+  }
+services:
+  Issues: |
+    schema {
+      query: Query
+    }
+
+    type Issue {
+      labels: [[String]]
+    }
+
+    type IssueDetail {
+      issue: Issue
+    }
+
+    type Query {
+      details: [IssueDetail]
+    }
+ndsls:
+  Issues: |-
+    service Issues {
+        type Query {
+            details: [IssueDetail]
+        }
+        type IssueDetail {
+            labels: [[String]] => renamed from issue.labels
+        }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type IssueDetail {
+    issue: Issue @omitted
+    labels: [[String]] @pull(from: ["issue", "labels"])
+  }
+
+  type Query {
+    details: [IssueDetail]
+  }
+
+  type Issue {
+    labels: [[String]]
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Issues {
+      details {
+        issue {
+          labels
+        }
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "details" : [
+          {
+            "issue" : {
+              "labels" : [
+                [
+                  "label1",
+                  "label2"
+                ],
+                [
+                  "label3"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "details" : [
+        {
+          "labels" : [
+            [
+              "label1",
+              "label2"
+            ],
+            [
+              "label3"
+            ]
+          ]
+        }
+      ]
+    },
+    "extensions" : { }
+  }

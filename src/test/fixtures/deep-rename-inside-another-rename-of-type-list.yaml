@@ -1,0 +1,154 @@
+---
+name: deep rename inside another rename of type List
+query: |-
+  query {
+    boardScope {
+      board {
+        cardChildren {
+          id
+          key
+          summary
+        }
+      }
+    }
+  }
+services:
+  Issues: |
+    schema {
+      query: Query
+    }
+
+    type Board {
+      id: ID
+      issueChildren: [Card]
+    }
+
+    type BoardScope {
+      board: Board
+    }
+
+    type Card {
+      id: ID
+      issue: Issue
+    }
+
+    type Issue {
+      id: ID
+      key: String
+      summary: String
+    }
+
+    type Query {
+      boardScope: BoardScope
+    }
+ndsls:
+  Issues: "service Issues {\n    type Query {\n        boardScope: BoardScope\n  \
+    \  }\n    type BoardScope {\n        board: SoftwareBoard\n    }\n    type SoftwareBoard\
+    \ => renamed from Board{\n        cardChildren: [SoftwareCard] => renamed from\
+    \ issueChildren\n    }\n    type SoftwareCard => renamed from Card {\n       \
+    \ id: ID \n        key: String => renamed from issue.key\n        summary: String\
+    \ => renamed from issue.summary\n    }\n}"
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type BoardScope {
+    board: SoftwareBoard
+  }
+
+  type Query {
+    boardScope: BoardScope
+  }
+
+  type SoftwareBoard @renamed(from: "Board") {
+    issueChildren: [Card] @omitted
+    cardChildren: [SoftwareCard] @renamed(from: "issueChildren")
+  }
+
+  type SoftwareCard @renamed(from: "Card") {
+    issue: Issue @omitted
+    issue: Issue @omitted
+    id: ID
+    key: String @pull(from: ["issue", "key"])
+    summary: String @pull(from: ["issue", "summary"])
+  }
+
+  type Issue {
+    id: ID
+    key: String
+    summary: String
+  }
+
+  type Issue {
+    id: ID
+    key: String
+    summary: String
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Issues {
+      boardScope {
+        board {
+          issueChildren {
+            id
+            issue {
+              key
+            }
+            issue {
+              summary
+            }
+          }
+        }
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "boardScope" : {
+          "board" : {
+            "issueChildren" : [
+              {
+                "id" : "1234",
+                "issue" : {
+                  "key" : "abc",
+                  "summary" : "Summary 1"
+                }
+              },
+              {
+                "id" : "456",
+                "issue" : {
+                  "key" : "def",
+                  "summary" : "Summary 2"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "boardScope" : {
+        "board" : {
+          "cardChildren" : [
+            {
+              "id" : "1234",
+              "key" : "abc",
+              "summary" : "Summary 1"
+            },
+            {
+              "id" : "456",
+              "key" : "def",
+              "summary" : "Summary 2"
+            }
+          ]
+        }
+      }
+    },
+    "extensions" : { }
+  }

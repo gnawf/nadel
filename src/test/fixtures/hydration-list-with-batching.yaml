@@ -1,0 +1,147 @@
+---
+name: hydration list with batching
+query: |-
+  query {
+    foo {
+      bar {
+        name
+      }
+    }
+  }
+services:
+  service2: |
+    schema {
+      query: Query
+    }
+
+    type Bar {
+      id: ID
+      name: String
+    }
+
+    type Query {
+      barsById(id: [ID]): [Bar]
+    }
+  service1: |
+    schema {
+      query: Query
+    }
+
+    type Foo {
+      barId: [ID]
+      id: ID
+    }
+
+    type Query {
+      foo: Foo
+    }
+ndsls:
+  service2: |-
+    service service2 {
+        type Query {
+            barsById(id: [ID]): [Bar]
+        }
+        type Bar {
+            id: ID
+            name: String
+        }
+    }
+  service1: |-
+    service service1 {
+        type Query {
+            foo: Foo
+        }
+        type Foo {
+            id: ID
+            bar: [Bar] => hydrated from service2.barsById(id: $source.barId)
+        }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Bar {
+    id: ID
+    name: String
+  }
+
+  type Foo {
+    barId: [ID] @omitted
+    bar: [Bar] @hydrated(from: ["barsById"] arguments: [{name: "id" valueFromField: ["barId"]}] objectId: "id")
+    id: ID
+  }
+
+  type Query {
+    barsById(id: [ID]): [Bar]
+    foo: Foo
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_service2 {
+      barsById(id: ["barId1", "barId2", "barId3"]) {
+        name
+        object_identifier__UUID: id
+      }
+    }
+  call-1: |-
+    query nadel_2_service1 {
+      foo {
+        barId
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "foo" : {
+          "barId" : [
+            "barId1",
+            "barId2",
+            "barId3"
+          ]
+        }
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "barsById" : [
+          {
+            "object_identifier__UUID" : "barId1",
+            "name" : "Bar1"
+          },
+          {
+            "object_identifier__UUID" : "barId2",
+            "name" : "Bar2"
+          },
+          {
+            "object_identifier__UUID" : "barId3",
+            "name" : "Bar3"
+          }
+        ]
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "foo" : {
+        "bar" : [
+          {
+            "name" : "Bar1"
+          },
+          {
+            "name" : "Bar2"
+          },
+          {
+            "name" : "Bar3"
+          }
+        ]
+      }
+    },
+    "extensions" : { }
+  }

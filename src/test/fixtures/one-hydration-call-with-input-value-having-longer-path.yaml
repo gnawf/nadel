@@ -1,0 +1,140 @@
+---
+name: one hydration call with input value having longer path
+query: |-
+  query {
+    foo {
+      barLongerInput {
+        name
+      }
+    }
+  }
+services:
+  service2: |
+    schema {
+      query: Query
+    }
+
+    type Bar {
+      id: ID
+      name: String
+    }
+
+    type Query {
+      barById(id: ID): Bar
+    }
+  service1: |
+    schema {
+      query: Query
+    }
+
+    type Foo {
+      barId: ID
+      fooDetails: FooDetails
+      id: ID
+    }
+
+    type FooDetails {
+      externalBarId: ID
+    }
+
+    type Query {
+      foo(id: ID): Foo
+    }
+ndsls:
+  service2: |-
+    service service2 {
+        type Query {
+            barById(id: ID): Bar
+        }
+        type Bar {
+            id: ID
+            name: String
+        }
+    }
+  service1: |-
+    service service1 {
+        type Query {
+            foo(id : ID): Foo
+        }
+        type Foo {
+            id: ID
+            bar: Bar => hydrated from service2.barById(id: $source.barId)
+            barLongerInput: Bar => hydrated from service2.barById(id: $source.fooDetails.externalBarId)
+        }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Bar {
+    id: ID
+    name: String
+  }
+
+  type Foo {
+    fooDetails: FooDetails @omitted
+    barId: ID @omitted
+    bar: Bar @hydrated(from: ["barById"] arguments: [{name: "id" valueFromField: ["barId"]}] objectId: "id")
+    barLongerInput: Bar @hydrated(from: ["barById"] arguments: [{name: "id" valueFromField: ["fooDetails", "externalBarId"]}] objectId: "id")
+    id: ID
+  }
+
+  type Query {
+    barById(id: ID): Bar
+    foo(id: ID): Foo
+  }
+
+  type FooDetails {
+    externalBarId: ID
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_service1 {
+      foo {
+        fooDetails {
+          externalBarId
+        }
+      }
+    }
+  call-1: |-
+    query nadel_2_service2 {
+      barById(id: "barId") {
+        name
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "foo" : {
+          "fooDetails" : {
+            "externalBarId" : "barId"
+          }
+        }
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "barById" : {
+          "id" : "barId",
+          "name" : "Bar1"
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "foo" : {
+        "barLongerInput" : {
+          "name" : "Bar1"
+        }
+      }
+    },
+    "extensions" : { }
+  }

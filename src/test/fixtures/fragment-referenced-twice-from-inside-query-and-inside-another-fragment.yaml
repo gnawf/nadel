@@ -1,0 +1,85 @@
+---
+name: fragment referenced twice from inside Query and inside another Fragment
+query: |-
+  query {
+    foo {
+      id
+      ...F2
+      ...F1
+    }
+  }
+
+  fragment F2 on Bar {
+    id
+  }
+
+  fragment F1 on Bar {
+    id
+    ...F2
+  }
+services:
+  Foo: |
+    schema {
+      query: Query
+    }
+
+    type Bar {
+      id: String
+    }
+
+    type Query {
+      foo: Bar
+    }
+ndsls:
+  Foo: "service Foo {\n      type Query {\n        foo: Bar \n      } \n      type\
+    \ Bar {\n         id: String\n      }\n}"
+schema: |
+  schema {
+    query: Query
+  }
+
+  type Bar {
+    id: String
+  }
+
+  type Query {
+    foo: Bar
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Foo {
+      foo {
+        id
+        ...F2
+        ...F1
+      }
+    }
+
+    fragment F2 on Bar {
+      id
+    }
+
+    fragment F1 on Bar {
+      id
+      ...F2
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "foo" : {
+          "id" : "ID"
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "foo" : {
+        "id" : "ID"
+      }
+    },
+    "extensions" : { }
+  }

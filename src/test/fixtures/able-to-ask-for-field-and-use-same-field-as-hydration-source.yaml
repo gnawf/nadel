@@ -1,0 +1,109 @@
+---
+name: able to ask for field and use same field as hydration source
+query: |-
+  query {
+    bar {
+      barId
+      nestedBar {
+        nestedBar {
+          barId
+        }
+        barId
+      }
+      name
+    }
+  }
+services:
+  Bar: |
+    schema {
+      query: Query
+    }
+
+    type Bar {
+      barId: ID
+      name: String
+    }
+
+    type Query {
+      bar: Bar
+      barById(id: ID): Bar
+    }
+ndsls:
+  Bar: "service Bar {\n    type Query {\n        bar: Bar \n    } \n    type Bar {\n\
+    \        barId: ID\n        name: String \n        nestedBar: Bar => hydrated\
+    \ from Bar.barById(id: $source.barId)\n    }\n}"
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Bar {
+    barId: ID @omitted
+    barId: ID
+    name: String
+    nestedBar: Bar @hydrated(from: ["barById"] arguments: [{name: "id" valueFromField: ["barId"]}] objectId: "id")
+  }
+
+  type Query {
+    bar: Bar
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Bar {
+      bar {
+        barId
+        barId
+        name
+      }
+    }
+  call-2: |-
+    query nadel_2_Bar {
+      barById(id: "1") {
+        barId
+      }
+    }
+  call-1: |-
+    query nadel_2_Bar {
+      barById(id: "1") {
+        barId
+        barId
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "bar" : {
+          "barId" : "1",
+          "name" : "Test"
+        }
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "barById" : {
+          "barId" : "1"
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "bar" : {
+        "barId" : "1",
+        "nestedBar" : {
+          "barId" : "1",
+          "nestedBar" : {
+            "barId" : "1"
+          }
+        },
+        "name" : "Test"
+      }
+    },
+    "extensions" : { }
+  }

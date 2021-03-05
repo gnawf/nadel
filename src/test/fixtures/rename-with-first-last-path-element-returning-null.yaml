@@ -1,0 +1,83 @@
+---
+name: rename with first last path element returning null
+query: |-
+  query {
+    issue {
+      name
+    }
+  }
+services:
+  Issues: |
+    schema {
+      query: Query
+    }
+
+    type Issue {
+      details: IssueDetails
+    }
+
+    type IssueDetails {
+      name: String
+    }
+
+    type Query {
+      issue: Issue
+    }
+ndsls:
+  Issues: |-
+    service Issues {
+        type Query {
+            issue: Issue
+        }
+        type Issue {
+            name: String => renamed from details.name
+        }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Issue {
+    details: IssueDetails @omitted
+    name: String @pull(from: ["details", "name"])
+  }
+
+  type Query {
+    issue: Issue
+  }
+
+  type IssueDetails {
+    name: String
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Issues {
+      issue {
+        details {
+          name
+        }
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "issue" : {
+          "details" : {
+            "name" : null
+          }
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "issue" : {
+        "name" : null
+      }
+    },
+    "extensions" : { }
+  }

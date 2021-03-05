@@ -1,0 +1,228 @@
+---
+name: Expecting one child Error on extensive field argument passed to synthetic hydration
+query: |-
+  query {
+    board(id: 1) {
+      id
+      cardChildren {
+        assignee {
+          accountId
+        }
+      }
+    }
+  }
+services:
+  TestBoard: |
+    schema {
+      query: Query
+    }
+
+    type Board {
+      id: ID
+      issueChildren: [Card]
+    }
+
+    type Card {
+      id: ID
+      issue: Issue
+    }
+
+    type Issue {
+      assignee: TestUser
+      id: ID
+    }
+
+    type Query {
+      board(id: ID): Board
+    }
+
+    type TestUser {
+      accountId: String
+    }
+  Users: |
+    schema {
+      query: Query
+    }
+
+    type Query {
+      usersQuery: UserQuery
+    }
+
+    type User {
+      accountId: ID
+    }
+
+    type UserQuery {
+      users(accountIds: [ID]): [User]
+    }
+ndsls:
+  TestBoard: |-
+    service TestBoard {
+        type Query {
+            board(id: ID) : SoftwareBoard
+        }
+        type SoftwareBoard => renamed from Board {
+            id: ID
+            cardChildren: [SoftwareCard] => renamed from issueChildren
+        }
+        type SoftwareCard => renamed from Card {
+            id: ID
+            assignee: User => hydrated from Users.usersQuery.users(accountIds: $source.issue.assignee.accountId) object identified by accountId, batch size 3
+        }
+    }
+  Users: |-
+    service Users {
+        type Query {
+            usersQuery: UserQuery
+        }
+        type UserQuery {
+            users(accountIds: [ID]): [User]
+        }
+        type User {
+            accountId: ID
+        }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Query {
+    board(id: ID): SoftwareBoard
+    usersQuery: UserQuery
+  }
+
+  type SoftwareBoard @renamed(from: "Board") {
+    issueChildren: [Card] @omitted
+    cardChildren: [SoftwareCard] @renamed(from: "issueChildren")
+    id: ID
+  }
+
+  type SoftwareCard @renamed(from: "Card") {
+    issue: Issue @omitted
+    assignee: User @hydrated(from: ["usersQuery", "users"] arguments: [{name: "accountIds" valueFromField: ["issue", "assignee", "accountId"]}] objectId: "accountId" batchSize: "3")
+    id: ID
+  }
+
+  type User {
+    accountId: ID
+  }
+
+  type UserQuery {
+    users(accountIds: [ID]): [User]
+  }
+
+  type Issue {
+    id: ID
+    assignee: TestUser
+  }
+
+  type TestUser {
+    accountId: String
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Users {
+      usersQuery {
+        users(accountIds: ["1", "2", "3"]) {
+          accountId
+          object_identifier__UUID: accountId
+        }
+      }
+    }
+  call-1: |-
+    query nadel_2_TestBoard {
+      board(id: 1) {
+        id
+        issueChildren {
+          issue {
+            assignee {
+              accountId
+            }
+          }
+        }
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "board" : {
+          "id" : "1",
+          "issueChildren" : [
+            {
+              "issue" : {
+                "assignee" : {
+                  "accountId" : "1"
+                }
+              }
+            },
+            {
+              "issue" : {
+                "assignee" : {
+                  "accountId" : "2"
+                }
+              }
+            },
+            {
+              "issue" : {
+                "assignee" : {
+                  "accountId" : "3"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "usersQuery" : {
+          "users" : [
+            {
+              "accountId" : "1",
+              "object_identifier__UUID" : "1"
+            },
+            {
+              "accountId" : "2",
+              "object_identifier__UUID" : "2"
+            },
+            {
+              "accountId" : "3",
+              "object_identifier__UUID" : "3"
+            }
+          ]
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "board" : {
+        "id" : "1",
+        "cardChildren" : [
+          {
+            "assignee" : {
+              "accountId" : "1"
+            }
+          },
+          {
+            "assignee" : {
+              "accountId" : "2"
+            }
+          },
+          {
+            "assignee" : {
+              "accountId" : "3"
+            }
+          }
+        ]
+      }
+    },
+    "extensions" : { }
+  }

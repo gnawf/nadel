@@ -1,0 +1,62 @@
+---
+name: call with variables inside input objects
+query: |-
+  query myQuery($varIds: [ID], $otherVar: String) {
+    hello(arg: {ids : $varIds}, otherArg: $otherVar)
+  }
+services:
+  MyService: |
+    schema {
+      query: Query
+    }
+
+    type Query {
+      hello(arg: Arg, otherArg: String): String
+    }
+
+    input Arg {
+      ids: [ID]
+    }
+ndsls:
+  MyService: |-
+    service  MyService{
+        type Query {
+            hello(arg: Arg, otherArg: String): String
+        }
+        input Arg {
+            ids: [ID]
+        }
+    }
+schema: |
+  schema {
+    query: Query
+  }
+
+  type Query {
+    hello(arg: Arg, otherArg: String): String
+  }
+
+  input Arg {
+    ids: [ID]
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_MyService($varIds: [ID], $otherVar: String) {
+      hello(arg: {ids : $varIds}, otherArg: $otherVar)
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "hello" : "world"
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "hello" : "world"
+    },
+    "extensions" : { }
+  }

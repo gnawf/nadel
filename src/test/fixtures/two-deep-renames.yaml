@@ -1,0 +1,122 @@
+---
+name: two deep renames
+query: |-
+  query {
+    issues {
+      id
+      authorId
+      authorName
+    }
+  }
+services:
+  Issues: |
+    schema {
+      query: Query
+    }
+
+    type AuthorDetail {
+      authorId: ID
+      name: String
+    }
+
+    type Issue {
+      authorDetails: AuthorDetail
+      id: ID
+    }
+
+    type Query {
+      issues: [Issue]
+    }
+ndsls:
+  Issues: |-
+    service Issues {
+        type Query {
+            issues: [Issue]
+        }
+        type Issue {
+            id: ID
+            authorId: ID => renamed from authorDetails.authorId
+            authorName: ID => renamed from authorDetails.name
+        }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Issue {
+    authorDetails: AuthorDetail @omitted
+    authorDetails: AuthorDetail @omitted
+    authorId: ID @pull(from: ["authorDetails", "authorId"])
+    authorName: ID @pull(from: ["authorDetails", "name"])
+    id: ID
+  }
+
+  type Query {
+    issues: [Issue]
+  }
+
+  type AuthorDetail {
+    authorId: ID
+    name: String
+  }
+
+  type AuthorDetail {
+    authorId: ID
+    name: String
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Issues {
+      issues {
+        id
+        authorDetails {
+          authorId
+        }
+        authorDetails {
+          name
+        }
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "issues" : [
+          {
+            "id" : "ISSUE-1",
+            "authorDetails" : {
+              "authorId" : "USER-1",
+              "name" : "User 1"
+            }
+          },
+          {
+            "id" : "ISSUE-2",
+            "authorDetails" : {
+              "authorId" : "USER-2",
+              "name" : "User 2"
+            }
+          }
+        ]
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "issues" : [
+        {
+          "id" : "ISSUE-1",
+          "authorId" : "USER-1",
+          "authorName" : "User 1"
+        },
+        {
+          "id" : "ISSUE-2",
+          "authorId" : "USER-2",
+          "authorName" : "User 2"
+        }
+      ]
+    },
+    "extensions" : { }
+  }

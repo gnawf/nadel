@@ -1,0 +1,137 @@
+---
+name: same source for 2 hydrations
+query: |-
+  query {
+    foo {
+      issue {
+        field
+      }
+      detail {
+        name
+      }
+    }
+  }
+services:
+  Foo: |
+    schema {
+      query: Query
+    }
+
+    type Detail {
+      detailId: ID!
+      name: String
+    }
+
+    type Foo {
+      field: String
+      fooId: ID
+      issue: Issue
+    }
+
+    type Issue {
+      field: String
+      fooId: ID
+    }
+
+    type Query {
+      detail(detailId: ID): Detail
+      foo: Foo
+      issue(issueId: ID): Issue
+    }
+ndsls:
+  Foo: "service Foo {\n      type Query {\n        foo: Foo\n      } \n      type\
+    \ Foo {\n         issue: Issue => hydrated from Foo.issue(issueId: $source.fooId)\n\
+    \         detail: Detail => hydrated from Foo.detail(detailId: $source.fooId)\n\
+    \      }\n      type Detail {\n         detailId: ID!\n         name: String\n\
+    \      }\n      type Issue {\n        fooId: ID\n        field: String\n     \
+    \ }\n}"
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Detail {
+    detailId: ID!
+    name: String
+  }
+
+  type Foo {
+    fooId: ID @omitted
+    fooId: ID @omitted
+    detail: Detail @hydrated(from: ["detail"] arguments: [{name: "detailId" valueFromField: ["fooId"]}] objectId: "id")
+    issue: Issue @hydrated(from: ["issue"] arguments: [{name: "issueId" valueFromField: ["fooId"]}] objectId: "id")
+  }
+
+  type Issue {
+    field: String
+    fooId: ID
+  }
+
+  type Query {
+    foo: Foo
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Foo {
+      issue(issueId: "ID") {
+        field
+      }
+    }
+  call-2: |-
+    query nadel_2_Foo {
+      detail(detailId: "ID") {
+        name
+      }
+    }
+  call-1: |-
+    query nadel_2_Foo {
+      foo {
+        fooId
+        fooId
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "foo" : {
+          "fooId" : "ID"
+        }
+      },
+      "extensions" : { }
+    }
+  call-2: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "detail" : {
+          "name" : "apple"
+        }
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "issue" : {
+          "field" : "field_name"
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "foo" : {
+        "issue" : {
+          "field" : "field_name"
+        },
+        "detail" : {
+          "name" : "apple"
+        }
+      }
+    },
+    "extensions" : { }
+  }

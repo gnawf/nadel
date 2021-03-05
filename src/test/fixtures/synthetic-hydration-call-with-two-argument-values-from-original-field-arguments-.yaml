@@ -1,0 +1,142 @@
+---
+name: 'synthetic hydration call with two argument values from original field arguments '
+query: |-
+  query {
+    issues {
+      id
+      author(extraArg1: "extraArg1", extraArg2: 10) {
+        name
+      }
+    }
+  }
+services:
+  UserService: |
+    schema {
+      query: Query
+    }
+
+    type Query {
+      usersQuery: UsersQuery
+    }
+
+    type User {
+      id: ID
+      name: String
+    }
+
+    type UsersQuery {
+      usersByIds(extraArg1: String, extraArg2: Int, id: [ID]): [User]
+    }
+  Issues: |
+    schema {
+      query: Query
+    }
+
+    type Issue {
+      authorId: ID
+      id: ID
+    }
+
+    type Query {
+      issues: [Issue]
+    }
+ndsls:
+  UserService: "service UserService {\n    type Query {\n        usersQuery: UsersQuery\n\
+    \    }\n    type UsersQuery {\n       usersByIds(extraArg1: String, extraArg2:\
+    \ Int, id: [ID]): [User]       \n    }\n    type User {\n        id: ID\n    \
+    \    name: String\n    }\n}"
+  Issues: |-
+    service Issues {
+        type Query {
+            issues: [Issue]
+        }
+        type Issue {
+            id: ID
+            author(extraArg: String): User => hydrated from UserService.usersQuery.usersByIds(extraArg1: $argument.extraArg1, extraArg2: $argument.extraArg2, id: $source.authorId) object identified by id, batch size 2
+        }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Issue {
+    authorId: ID @omitted
+    author(extraArg: String): User @hydrated(from: ["usersQuery", "usersByIds"] arguments: [{name: "extraArg1" valueFromArg: "extraArg1"} {name: "extraArg2" valueFromArg: "extraArg2"} {name: "id" valueFromField: ["authorId"]}] objectId: "id" batchSize: "2")
+    id: ID
+  }
+
+  type Query {
+    issues: [Issue]
+    usersQuery: UsersQuery
+  }
+
+  type User {
+    id: ID
+    name: String
+  }
+
+  type UsersQuery {
+    usersByIds(extraArg1: String, extraArg2: Int, id: [ID]): [User]
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_UserService {
+      usersQuery {
+        usersByIds(id: ["USER-1"], extraArg1: "extraArg1", extraArg2: 10) {
+          name
+          object_identifier__UUID: id
+        }
+      }
+    }
+  call-1: |-
+    query nadel_2_Issues {
+      issues {
+        id
+        authorId
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "issues" : [
+          {
+            "id" : "ISSUE-1",
+            "authorId" : "USER-1"
+          }
+        ]
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "usersQuery" : {
+          "usersByIds" : [
+            {
+              "id" : "USER-1",
+              "name" : "User 1",
+              "object_identifier__UUID" : "USER-1"
+            }
+          ]
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "issues" : [
+        {
+          "id" : "ISSUE-1",
+          "author" : {
+            "name" : "User 1"
+          }
+        }
+      ]
+    },
+    "extensions" : { }
+  }

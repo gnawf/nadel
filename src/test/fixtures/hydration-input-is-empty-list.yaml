@@ -1,0 +1,113 @@
+---
+name: hydration input is empty list
+query: |-
+  query {
+    issues {
+      id
+      authors {
+        name
+      }
+    }
+  }
+services:
+  UserService: |
+    schema {
+      query: Query
+    }
+
+    type Query {
+      usersByIds(ids: [ID]): [User]
+    }
+
+    type User {
+      id: ID
+      name: String
+    }
+  Issues: |
+    schema {
+      query: Query
+    }
+
+    type Issue {
+      authorIds: [ID]
+      id: ID
+    }
+
+    type Query {
+      issues: [Issue]
+    }
+ndsls:
+  UserService: |-
+    service UserService {
+        type Query {
+            usersByIds(ids: [ID]): [User]
+        }
+        type User {
+            id: ID
+            name: String
+        }
+    }
+  Issues: |-
+    service Issues {
+        type Query {
+            issues: [Issue]
+        }
+        type Issue {
+            id: ID
+            authors: [User] => hydrated from UserService.usersByIds(ids: $source.authorIds) object identified by id, batch size 2
+        }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Issue {
+    authorIds: [ID] @omitted
+    authors: [User] @hydrated(from: ["usersByIds"] arguments: [{name: "ids" valueFromField: ["authorIds"]}] objectId: "id" batchSize: "2")
+    id: ID
+  }
+
+  type Query {
+    issues: [Issue]
+    usersByIds(ids: [ID]): [User]
+  }
+
+  type User {
+    id: ID
+    name: String
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Issues {
+      issues {
+        id
+        authorIds
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "issues" : [
+          {
+            "id" : "ISSUE-1",
+            "authorIds" : [ ]
+          }
+        ]
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "issues" : [
+        {
+          "id" : "ISSUE-1",
+          "authors" : [ ]
+        }
+      ]
+    },
+    "extensions" : { }
+  }

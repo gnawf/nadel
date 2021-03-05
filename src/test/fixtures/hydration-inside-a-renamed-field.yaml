@@ -1,0 +1,125 @@
+---
+name: hydration inside a renamed field
+query: |-
+  query {
+    foo {
+      id
+      fooBar {
+        id
+      }
+    }
+  }
+services:
+  Bar: |
+    schema {
+      query: Query
+    }
+
+    type Bar {
+      id: ID
+    }
+
+    type Query {
+      barById(id: ID!): Bar
+    }
+  Foo: |
+    schema {
+      query: Query
+    }
+
+    type Foo {
+      fooBarId: ID
+      id: ID!
+    }
+
+    type Query {
+      fooOriginal: Foo
+    }
+ndsls:
+  Bar: |-
+    service Bar {
+        type Query {
+            barById(id: ID!): RenamedBar
+        }
+        type RenamedBar => renamed from Bar {
+            id: ID!
+        }
+    }
+  Foo: |-
+    service Foo {
+        type Query {
+            foo: Foo => renamed from fooOriginal
+        }
+        type Foo {
+            id: ID!
+            fooBar: RenamedBar => hydrated from Bar.barById(id: $source.fooBarId)
+        }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Foo {
+    fooBarId: ID @omitted
+    fooBar: RenamedBar @hydrated(from: ["barById"] arguments: [{name: "id" valueFromField: ["fooBarId"]}] objectId: "id")
+    id: ID!
+  }
+
+  type Query {
+    fooOriginal: Foo @omitted
+    barById(id: ID!): RenamedBar
+    foo: Foo @renamed(from: "fooOriginal")
+  }
+
+  type RenamedBar @renamed(from: "Bar") {
+    id: ID!
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Bar {
+      barById(id: "hydrated-bar") {
+        id
+      }
+    }
+  call-1: |-
+    query nadel_2_Foo {
+      fooOriginal {
+        id
+        fooBarId
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "fooOriginal" : {
+          "id" : "Foo",
+          "fooBarId" : "hydrated-bar"
+        }
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "barById" : {
+          "id" : "hydrated-bar"
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "foo" : {
+        "id" : "Foo",
+        "fooBar" : {
+          "id" : "hydrated-bar"
+        }
+      }
+    },
+    "extensions" : { }
+  }

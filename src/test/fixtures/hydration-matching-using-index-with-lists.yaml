@@ -1,0 +1,157 @@
+---
+name: hydration matching using index with lists
+query: |-
+  query {
+    issues {
+      id
+      authors {
+        name
+      }
+    }
+  }
+services:
+  UserService: |
+    schema {
+      query: Query
+    }
+
+    type Query {
+      usersByIssueIds(issueIds: [ID]): [[User]]
+    }
+
+    type User {
+      id: ID
+      name: String
+    }
+  Issues: |
+    schema {
+      query: Query
+    }
+
+    type Issue {
+      id: ID
+    }
+
+    type Query {
+      issues: [Issue]
+    }
+ndsls:
+  UserService: |-
+    service UserService {
+        type Query {
+            usersByIssueIds(issueIds: [ID]): [[User]]
+        }
+        type User {
+            id: ID
+            name: String
+        }
+    }
+  Issues: |-
+    service Issues {
+        type Query {
+            issues: [Issue]
+        }
+        type Issue {
+            id: ID
+            authors: [User] => hydrated from UserService.usersByIssueIds(issueIds: $source.id) using indexes, batch size 5
+        }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Issue {
+    id: ID @omitted
+    authors: [User] @hydrated(from: ["usersByIssueIds"] arguments: [{name: "issueIds" valueFromField: ["id"]}] objectMatchByIndex: true batchSize: "5")
+    id: ID
+  }
+
+  type Query {
+    issues: [Issue]
+    usersByIssueIds(issueIds: [ID]): [[User]]
+  }
+
+  type User {
+    id: ID
+    name: String
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_UserService {
+      usersByIssueIds(issueIds: ["ISSUE-1", "ISSUE-2"]) {
+        name
+      }
+    }
+  call-1: |-
+    query nadel_2_Issues {
+      issues {
+        id
+        id
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "issues" : [
+          {
+            "id" : "ISSUE-1"
+          },
+          {
+            "id" : "ISSUE-2"
+          }
+        ]
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "usersByIssueIds" : [
+          [
+            {
+              "name" : "Name"
+            }
+          ],
+          [
+            {
+              "name" : "Name"
+            },
+            {
+              "name" : "Name 2"
+            }
+          ]
+        ]
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "issues" : [
+        {
+          "id" : "ISSUE-1",
+          "authors" : [
+            {
+              "name" : "Name"
+            }
+          ]
+        },
+        {
+          "id" : "ISSUE-2",
+          "authors" : [
+            {
+              "name" : "Name"
+            },
+            {
+              "name" : "Name 2"
+            }
+          ]
+        }
+      ]
+    },
+    "extensions" : { }
+  }

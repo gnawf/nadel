@@ -1,0 +1,128 @@
+---
+name: renamed list inside renamed list
+query: |-
+  query {
+    renamedIssue {
+      renamedTicket {
+        renamedTicketTypes {
+          renamedId
+          renamedDate
+        }
+      }
+    }
+  }
+services:
+  IssuesService: |
+    schema {
+      query: Query
+    }
+
+    type Issue {
+      ticket: Ticket
+    }
+
+    type Query {
+      issue: [Issue]
+    }
+
+    type Ticket {
+      ticketTypes: [TicketType]
+    }
+
+    type TicketType {
+      date: String
+      id: String
+    }
+ndsls:
+  IssuesService: |-
+    service IssuesService {
+       type Query {
+           renamedIssue: [RenamedIssue] => renamed from issue
+       }
+       type RenamedIssue => renamed from Issue {
+           renamedTicket: RenamedTicket => renamed from ticket
+       }
+       type RenamedTicket => renamed from Ticket  {
+           renamedTicketTypes: [RenamedTicketType]  => renamed from ticketTypes
+       }
+       type RenamedTicketType => renamed from TicketType {
+           renamedId: String => renamed from id
+           renamedDate: String => renamed from date
+       }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Query {
+    issue: [Issue] @omitted
+    renamedIssue: [RenamedIssue] @renamed(from: "issue")
+  }
+
+  type RenamedIssue @renamed(from: "Issue") {
+    ticket: Ticket @omitted
+    renamedTicket: RenamedTicket @renamed(from: "ticket")
+  }
+
+  type RenamedTicket @renamed(from: "Ticket") {
+    ticketTypes: [TicketType] @omitted
+    renamedTicketTypes: [RenamedTicketType] @renamed(from: "ticketTypes")
+  }
+
+  type RenamedTicketType @renamed(from: "TicketType") {
+    date: String @omitted
+    id: String @omitted
+    renamedDate: String @renamed(from: "date")
+    renamedId: String @renamed(from: "id")
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_IssuesService {
+      issue {
+        ticket {
+          ticketTypes {
+            id
+            date
+          }
+        }
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "issue" : [
+          {
+            "ticket" : {
+              "ticketTypes" : [
+                {
+                  "id" : "1",
+                  "date" : "20/11/2020"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "renamedIssue" : [
+        {
+          "renamedTicket" : {
+            "renamedTicketTypes" : [
+              {
+                "renamedId" : "1",
+                "renamedDate" : "20/11/2020"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "extensions" : { }
+  }

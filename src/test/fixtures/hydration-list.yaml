@@ -1,0 +1,177 @@
+---
+name: hydration list
+query: |-
+  query {
+    foo {
+      bar {
+        id
+        name
+      }
+    }
+  }
+services:
+  service2: |
+    schema {
+      query: Query
+    }
+
+    type Bar {
+      id: ID
+      name: String
+    }
+
+    type Query {
+      barById(id: ID): Bar
+    }
+  service1: |
+    schema {
+      query: Query
+    }
+
+    type Foo {
+      barId: [ID]
+      id: ID
+    }
+
+    type Query {
+      foo: Foo
+    }
+ndsls:
+  service2: |-
+    service service2 {
+        type Query {
+            barById(id: ID): Bar
+        }
+        type Bar {
+            id: ID
+            name: String
+        }
+    }
+  service1: |-
+    service service1 {
+        type Query {
+            foo: Foo
+        }
+        type Foo {
+            id: ID
+            bar: [Bar] => hydrated from service2.barById(id: $source.barId)
+        }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Bar {
+    id: ID
+    name: String
+  }
+
+  type Foo {
+    barId: [ID] @omitted
+    bar: [Bar] @hydrated(from: ["barById"] arguments: [{name: "id" valueFromField: ["barId"]}] objectId: "id")
+    id: ID
+  }
+
+  type Query {
+    barById(id: ID): Bar
+    foo: Foo
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_service2 {
+      barById(id: "barId1") {
+        id
+        name
+      }
+    }
+  call-2: |-
+    query nadel_2_service2 {
+      barById(id: "barId2") {
+        id
+        name
+      }
+    }
+  call-1: |-
+    query nadel_2_service2 {
+      barById(id: "barId3") {
+        id
+        name
+      }
+    }
+  call-3: |-
+    query nadel_2_service1 {
+      foo {
+        barId
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "foo" : {
+          "barId" : [
+            "barId1",
+            "barId2",
+            "barId3"
+          ]
+        }
+      },
+      "extensions" : { }
+    }
+  call-2: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "barById" : {
+          "id" : "barId2",
+          "name" : "Bar3"
+        }
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "barById" : {
+          "id" : "barId1",
+          "name" : "Bar1"
+        }
+      },
+      "extensions" : { }
+    }
+  call-3: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "barById" : {
+          "id" : "barId3",
+          "name" : "Bar4"
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "foo" : {
+        "bar" : [
+          {
+            "id" : "barId1",
+            "name" : "Bar1"
+          },
+          {
+            "id" : "barId2",
+            "name" : "Bar3"
+          },
+          {
+            "id" : "barId3",
+            "name" : "Bar4"
+          }
+        ]
+      }
+    },
+    "extensions" : { }
+  }

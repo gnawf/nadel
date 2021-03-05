@@ -1,0 +1,92 @@
+---
+name: non-nullable field error in lists bubbles up
+query: |-
+  query {
+    issues {
+      id
+    }
+  }
+services:
+  Issues: |
+    schema {
+      query: Query
+    }
+
+    type Issue {
+      id: ID!
+    }
+
+    type Query {
+      issues: [[[Issue!]!]]
+    }
+ndsls:
+  Issues: |-
+    service Issues {
+        type Query {
+            issues: [[[Issue!]!]]
+        }
+        type Issue {
+            id: ID!
+        }
+    }
+schema: |
+  schema {
+    query: Query
+  }
+
+  type Issue {
+    id: ID!
+  }
+
+  type Query {
+    issues: [[[Issue!]!]]
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Issues {
+      issues {
+        id
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "issues" : [
+          [
+            [
+              {
+                "id" : null
+              },
+              {
+                "id" : "will be discarded"
+              }
+            ]
+          ]
+        ]
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "errors" : [
+      {
+        "message" : "The field at path '/issues[0][0]' was declared as a non null type, but the code involved in retrieving data has wrongly returned a null value.  The graphql specification requires that the parent field be set to null, or if that is non nullable that it bubble up null to its parent and so on. The non-nullable type is '[Issue!]'.",
+        "path" : [
+          "issues",
+          0,
+          0
+        ],
+        "extensions" : {
+          "classification" : "NullValueInNonNullableField"
+        }
+      }
+    ],
+    "data" : {
+      "issues" : [
+        null
+      ]
+    },
+    "extensions" : { }
+  }

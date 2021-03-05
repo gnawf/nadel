@@ -1,0 +1,130 @@
+---
+name: hydration works when an ancestor field has been renamed
+query: |-
+  query {
+    devOpsRelationships {
+      nodes {
+        devOpsIssue {
+          id
+        }
+      }
+    }
+  }
+services:
+  IssueService: |
+    schema {
+      query: Query
+    }
+
+    type Issue {
+      id: ID
+    }
+
+    type Query {
+      issue(id: ID): Issue
+      relationships: RelationshipConnection
+    }
+
+    type Relationship {
+      issueId: ID
+    }
+
+    type RelationshipConnection {
+      nodes: [Relationship]
+    }
+ndsls:
+  IssueService: |-
+    service IssueService {
+       type DevOpsIssue => renamed from Issue {
+           id: ID
+       }
+       type DevOpsRelationship => renamed from Relationship {
+           devOpsIssue: DevOpsIssue => hydrated from IssueService.issue(id: $source.issueId)
+       }
+       type DevOpsRelationshipConnection => renamed from RelationshipConnection {
+           nodes: [DevOpsRelationship]
+       }
+       type Query {
+           devOpsRelationships: DevOpsRelationshipConnection => renamed from relationships
+           devOpsIssue(id: ID): DevOpsIssue => renamed from issue
+       }
+    }
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type DevOpsIssue @renamed(from: "Issue") {
+    id: ID
+  }
+
+  type DevOpsRelationship @renamed(from: "Relationship") {
+    issueId: ID @omitted
+    devOpsIssue: DevOpsIssue @hydrated(from: ["issue"] arguments: [{name: "id" valueFromField: ["issueId"]}] objectId: "id")
+  }
+
+  type DevOpsRelationshipConnection @renamed(from: "RelationshipConnection") {
+    nodes: [DevOpsRelationship]
+  }
+
+  type Query {
+    issue(id: ID): Issue @omitted
+    relationships: RelationshipConnection @omitted
+    devOpsIssue(id: ID): DevOpsIssue @renamed(from: "issue")
+    devOpsRelationships: DevOpsRelationshipConnection @renamed(from: "relationships")
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_IssueService {
+      issue(id: "1") {
+        id
+      }
+    }
+  call-1: |-
+    query nadel_2_IssueService {
+      relationships {
+        nodes {
+          issueId
+        }
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "relationships" : {
+          "nodes" : [
+            {
+              "issueId" : "1"
+            }
+          ]
+        }
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "issue" : {
+          "id" : "1"
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "devOpsRelationships" : {
+        "nodes" : [
+          {
+            "devOpsIssue" : {
+              "id" : "1"
+            }
+          }
+        ]
+      }
+    },
+    "extensions" : { }
+  }

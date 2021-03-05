@@ -1,0 +1,125 @@
+---
+name: extending types via hydration with arguments passed on
+query: |-
+  query {
+    issue {
+      association(filter: {name : "value"}) {
+        nameOfAssociation
+      }
+    }
+  }
+services:
+  Issue: |
+    schema {
+      query: Query
+    }
+
+    type Issue {
+      id: ID
+    }
+
+    type Query {
+      issue: Issue
+    }
+  Association: |
+    schema {
+      query: Query
+    }
+
+    type Association {
+      id: ID
+      nameOfAssociation: String
+    }
+
+    type Query {
+      association(filter: Filter, id: ID): Association
+    }
+
+    input Filter {
+      name: String
+    }
+ndsls:
+  Issue: |-
+    service Issue {
+        type Query {
+            issue: Issue
+        }
+        type Issue  {
+            id: ID
+        }
+    }
+  Association: "service Association {\n    type Query {\n        association(id: ID,\
+    \ filter: Filter): Association\n    }\n    input Filter  {\n        name: String\n\
+    \    }\n    type Association {\n        id: ID\n        nameOfAssociation: String\n\
+    \    }\n    extend type Issue {\n        association(filter:Filter): Association\
+    \ => hydrated from Association.association(id: $source.id, filter: $argument.filter)\n\
+    \    } \n}"
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Association {
+    id: ID
+    nameOfAssociation: String
+  }
+
+  type Issue {
+    id: ID @omitted
+    association(filter: Filter): Association @hydrated(from: ["association"] arguments: [{name: "id" valueFromField: ["id"]} {name: "filter" valueFromArg: "filter"}] objectId: "id")
+    id: ID
+  }
+
+  type Query {
+    association(filter: Filter, id: ID): Association
+    issue: Issue
+  }
+
+  input Filter {
+    name: String
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Issue {
+      issue {
+        id
+      }
+    }
+  call-1: |-
+    query nadel_2_Association {
+      association(id: "ISSUE-1", filter: {name : "value"}) {
+        nameOfAssociation
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "issue" : {
+          "id" : "ISSUE-1"
+        }
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "association" : {
+          "nameOfAssociation" : "ASSOC NAME"
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "issue" : {
+        "association" : {
+          "nameOfAssociation" : "ASSOC NAME"
+        }
+      }
+    },
+    "extensions" : { }
+  }

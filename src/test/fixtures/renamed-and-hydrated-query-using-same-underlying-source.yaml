@@ -1,0 +1,127 @@
+---
+name: renamed and hydrated query using same underlying source
+query: |-
+  query {
+    foo {
+      renamedField
+      details {
+        name
+      }
+    }
+  }
+services:
+  Foo: |
+    schema {
+      query: Query
+    }
+
+    type Detail {
+      detailId: ID!
+      name: String
+    }
+
+    type Foo {
+      field: String
+      fooId: ID
+      issue: Issue
+    }
+
+    type Issue {
+      field: String
+      fooId: ID
+    }
+
+    type Query {
+      detail(detailIds: [ID]): Detail
+      foo: Foo
+    }
+ndsls:
+  Foo: "service Foo {\n      type Query {\n        foo: Foo\n      } \n      type\
+    \ Foo {\n         renamedField: String => renamed from issue.field\n         details:\
+    \ [Detail] => hydrated from Foo.detail(detailIds: $source.issue.fooId)\n     \
+    \ }\n      type Detail {\n         detailId: ID!\n         name: String\n    \
+    \  }\n}"
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Detail {
+    detailId: ID!
+    name: String
+  }
+
+  type Foo {
+    issue: Issue @omitted
+    issue: Issue @omitted
+    details: [Detail] @hydrated(from: ["detail"] arguments: [{name: "detailIds" valueFromField: ["issue", "fooId"]}] objectId: "id")
+    renamedField: String @pull(from: ["issue", "field"])
+  }
+
+  type Query {
+    foo: Foo
+  }
+
+  type Issue {
+    fooId: ID
+    field: String
+  }
+
+  type Issue {
+    fooId: ID
+    field: String
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Foo {
+      foo {
+        issue {
+          field
+        }
+        issue {
+          fooId
+        }
+      }
+    }
+  call-1: |-
+    query nadel_2_Foo {
+      detail(detailIds: "ID") {
+        name
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "foo" : {
+          "issue" : {
+            "field" : "field",
+            "fooId" : "ID"
+          }
+        }
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "detail" : {
+          "name" : "apple"
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "foo" : {
+        "renamedField" : "field",
+        "details" : {
+          "name" : "apple"
+        }
+      }
+    },
+    "extensions" : { }
+  }

@@ -1,0 +1,49 @@
+---
+name: one call to one service
+query: |-
+  query {
+    foo
+  }
+services:
+  service: |
+    schema {
+      query: Query
+    }
+
+    type Query {
+      foo: String
+    }
+ndsls:
+  service1: |-
+    service service1 {
+        type Query {
+            foo: String
+        }
+    }
+schema: |
+  schema {
+    query: Query
+  }
+
+  type Query {
+    foo: String
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_service {
+      foo
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : null,
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "foo" : null
+    },
+    "extensions" : { }
+  }

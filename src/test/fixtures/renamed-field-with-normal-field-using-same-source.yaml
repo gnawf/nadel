@@ -1,0 +1,115 @@
+---
+name: renamed field with normal field using same source
+query: |-
+  query {
+    foo {
+      issue {
+        fooDetail {
+          name
+        }
+      }
+      renamedField
+    }
+  }
+services:
+  Foo: |
+    schema {
+      query: Query
+    }
+
+    type Detail {
+      detailId: ID!
+      name: String
+    }
+
+    type Foo {
+      field: String
+      issue: Issue
+    }
+
+    type Issue {
+      field: String
+      fooDetail: Detail
+    }
+
+    type Query {
+      detail(detailIds: [ID]): Detail
+      foo: Foo
+    }
+ndsls:
+  Foo: "service Foo {\n      type Query {\n        foo: Foo\n      } \n      type\
+    \ Foo {\n         renamedField: String => renamed from issue.field\n         issue:\
+    \ Issue\n      }\n      type Issue {\n        fooDetail: Detail\n      }\n   \
+    \   type Detail {\n         detailId: ID!\n         name: String\n      }\n}"
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Detail {
+    detailId: ID!
+    name: String
+  }
+
+  type Foo {
+    issue: Issue @omitted
+    issue: Issue
+    renamedField: String @pull(from: ["issue", "field"])
+  }
+
+  type Issue {
+    fooDetail: Detail
+  }
+
+  type Query {
+    foo: Foo
+  }
+
+  type Issue {
+    fooDetail: Detail
+    field: String
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Foo {
+      foo {
+        issue {
+          fooDetail {
+            name
+          }
+        }
+        issue {
+          field
+        }
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "foo" : {
+          "issue" : {
+            "field" : "field",
+            "fooDetail" : {
+              "name" : "fooName"
+            }
+          }
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "foo" : {
+        "issue" : {
+          "fooDetail" : {
+            "name" : "fooName"
+          }
+        },
+        "renamedField" : "field"
+      }
+    },
+    "extensions" : { }
+  }

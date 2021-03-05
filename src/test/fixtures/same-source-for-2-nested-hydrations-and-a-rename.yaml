@@ -1,0 +1,166 @@
+---
+name: same source for 2 nested hydrations and a rename
+query: |-
+  query {
+    foo {
+      issue {
+        field
+      }
+      detail {
+        name
+      }
+      renamedField
+    }
+  }
+services:
+  Foo: |
+    schema {
+      query: Query
+    }
+
+    type Detail {
+      detailId: ID!
+      name: String
+    }
+
+    type Foo {
+      field: String
+      fooId: ID
+      issue: Issue
+    }
+
+    type Issue {
+      field: String
+      fooId: ID
+    }
+
+    type Query {
+      detail(detailId: ID): Detail
+      foo: Foo
+      issue(issueId: ID): Issue
+    }
+ndsls:
+  Foo: "service Foo {\n      type Query {\n        foo: Foo\n      } \n      type\
+    \ Foo {\n         renamedField: String => renamed from issue.field\n         issue:\
+    \ Issue => hydrated from Foo.issue(issueId: $source.issue.fooId)\n         detail:\
+    \ Detail => hydrated from Foo.detail(detailId: $source.issue.fooId)\n      }\n\
+    \      type Detail {\n         detailId: ID!\n         name: String\n      }\n\
+    \      type Issue {\n        fooId: ID\n        field: String\n      }\n}"
+schema: |-
+  schema {
+    query: Query
+  }
+
+  type Detail {
+    detailId: ID!
+    name: String
+  }
+
+  type Foo {
+    issue: Issue @omitted
+    issue: Issue @omitted
+    issue: Issue @omitted
+    detail: Detail @hydrated(from: ["detail"] arguments: [{name: "detailId" valueFromField: ["issue", "fooId"]}] objectId: "id")
+    issue: Issue @hydrated(from: ["issue"] arguments: [{name: "issueId" valueFromField: ["issue", "fooId"]}] objectId: "id")
+    renamedField: String @pull(from: ["issue", "field"])
+  }
+
+  type Issue {
+    field: String
+    fooId: ID
+  }
+
+  type Query {
+    foo: Foo
+  }
+
+  type Issue {
+    fooId: ID
+    field: String
+  }
+
+  type Issue {
+    fooId: ID
+    field: String
+  }
+
+  type Issue {
+    fooId: ID
+    field: String
+  }
+underlyingQueries:
+  call-0: |-
+    query nadel_2_Foo {
+      issue(issueId: "ID") {
+        field
+      }
+    }
+  call-2: |-
+    query nadel_2_Foo {
+      detail(detailId: "ID") {
+        name
+      }
+    }
+  call-1: |-
+    query nadel_2_Foo {
+      foo {
+        issue {
+          fooId
+        }
+        issue {
+          fooId
+        }
+        issue {
+          field
+        }
+      }
+    }
+underlyingResults:
+  call-0: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "foo" : {
+          "issue" : {
+            "fooId" : "ID",
+            "field" : "field1"
+          }
+        }
+      },
+      "extensions" : { }
+    }
+  call-2: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "detail" : {
+          "name" : "apple"
+        }
+      },
+      "extensions" : { }
+    }
+  call-1: |-
+    {
+      "errors" : [ ],
+      "data" : {
+        "issue" : {
+          "field" : "field_name"
+        }
+      },
+      "extensions" : { }
+    }
+response: |-
+  {
+    "data" : {
+      "foo" : {
+        "issue" : {
+          "field" : "field_name"
+        },
+        "detail" : {
+          "name" : "apple"
+        },
+        "renamedField" : "field1"
+      }
+    },
+    "extensions" : { }
+  }
