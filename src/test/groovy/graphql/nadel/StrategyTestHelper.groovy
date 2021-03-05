@@ -7,6 +7,8 @@ import graphql.execution.nextgen.ExecutionHelper
 import graphql.nadel.dsl.ServiceDefinition
 import graphql.nadel.engine.NadelContext
 import graphql.nadel.engine.NadelExecutionStrategy
+import graphql.nadel.engine.NadelExecutionStrategyTest
+import graphql.nadel.engine.TestDumper
 import graphql.nadel.hooks.ServiceExecutionHooks
 import graphql.nadel.instrumentation.NadelInstrumentation
 import graphql.nadel.result.ResultComplexityAggregator
@@ -18,7 +20,6 @@ import spock.lang.Specification
 
 import java.util.concurrent.CompletableFuture
 
-import static graphql.language.AstPrinter.printAstCompact
 import static graphql.nadel.testutils.TestUtil.createNormalizedQuery
 import static graphql.nadel.testutils.TestUtil.parseQuery
 import static java.util.concurrent.CompletableFuture.completedFuture
@@ -42,8 +43,8 @@ class StrategyTestHelper extends Specification {
 
         boolean calledService1 = false
         ServiceExecution service1Execution = { ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            assert printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            assert TestDumper.printQueryCompact(sep.query) == expectedQuery1
             calledService1 = true
             return completedFuture(response1ServiceResult)
         }
@@ -81,7 +82,7 @@ class StrategyTestHelper extends Specification {
                                         List<String> expectedQueries,
                                         List<Map> responses,
                                         int nCalls,
-                                        ServiceExecutionHooks serviceExecutionHooks = new ServiceExecutionHooks () {},
+                                        ServiceExecutionHooks serviceExecutionHooks = new ServiceExecutionHooks() {},
                                         Map variables = [:],
                                         ResultComplexityAggregator resultComplexityAggregator
     ) {
@@ -94,8 +95,8 @@ class StrategyTestHelper extends Specification {
         def call = -1
         ServiceExecution service1Execution = { ServiceExecutionParameters sep ->
             call++
-            println printAstCompact(sep.query)
-            assert printAstCompact(sep.query) == expectedQueries[call]
+            println TestDumper.printQueryCompact(sep.query)
+            assert TestDumper.printQueryCompact(sep.query) == expectedQueries[call]
             calledService1 = true
             return completedFuture(serviceExecutionResults[call])
         }
@@ -148,15 +149,15 @@ class StrategyTestHelper extends Specification {
 
         boolean calledService1 = false
         ServiceExecution service1Execution = { ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            assert printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            assert TestDumper.printQueryCompact(sep.query) == expectedQuery1
             calledService1 = true
             return completedFuture(response1ServiceResult)
         }
         boolean calledService2 = false
         ServiceExecution service2Execution = { ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            assert printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            assert TestDumper.printQueryCompact(sep.query) == expectedQuery2
             calledService2 = true
             return completedFuture(response2ServiceResult)
         }
@@ -197,6 +198,8 @@ class StrategyTestHelper extends Specification {
     }
 
     ExecutionHelper.ExecutionData createExecutionData(String query, Map<String, Object> variables, GraphQLSchema overallSchema) {
+        NadelExecutionStrategyTest.incomingQuery = query
+
         def document = parseQuery(query)
         def normalizedQuery = createNormalizedQuery(overallSchema, document)
 

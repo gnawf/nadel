@@ -32,13 +32,23 @@ class NadelExecutionStrategyTest3 extends StrategyTestHelper {
         instrumentation = new NadelInstrumentation() {}
         serviceExecutionHooks = new ServiceExecutionHooks() {}
         resultComplexityAggregator = new ResultComplexityAggregator()
+
+        TestDumper.reset()
+        testName = null
     }
 
+    String testName
+
+    void cleanup() {
+        TestDumper.dump(testName)
+    }
 
     def "renamed and hydrated query using same underlying source"() {
+        testName = TestDumper.getTestName()
+
         given:
         def overallSchema = TestUtil.schemaFromNdsl([
-                Foo:'''
+                Foo: '''
         service Foo {
               type Query {
                 foo: Foo
@@ -102,15 +112,17 @@ class NadelExecutionStrategyTest3 extends StrategyTestHelper {
     }
 
     def "renamed field with normal field using same source"() {
+        testName = TestDumper.getTestName()
+
+
         given:
-        def overallSchema = TestUtil.schemaFromNdsl([Foo:'''
+        def overallSchema = TestUtil.schemaFromNdsl([Foo: '''
         service Foo {
               type Query {
                 foo: Foo
               } 
               type Foo {
                  renamedField: String => renamed from issue.field
-                 details: [Detail] => hydrated from Foo.detail(detailIds: $source.issue.fooId)
                  issue: Issue
               }
               type Issue {
@@ -169,8 +181,10 @@ class NadelExecutionStrategyTest3 extends StrategyTestHelper {
     }
 
     def "same source for 2 hydrations"() {
+        testName = TestDumper.getTestName()
+
         given:
-        def overallSchema = TestUtil.schemaFromNdsl([Foo:'''
+        def overallSchema = TestUtil.schemaFromNdsl([Foo: '''
         service Foo {
               type Query {
                 foo: Foo
@@ -243,8 +257,10 @@ class NadelExecutionStrategyTest3 extends StrategyTestHelper {
     }
 
     def "same source for 2 nested hydrations and a rename"() {
+        testName = TestDumper.getTestName()
+
         given:
-        def overallSchema = TestUtil.schemaFromNdsl([Foo:'''
+        def overallSchema = TestUtil.schemaFromNdsl([Foo: '''
         service Foo {
               type Query {
                 foo: Foo

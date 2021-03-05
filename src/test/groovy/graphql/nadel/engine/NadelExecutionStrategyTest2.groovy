@@ -21,11 +21,11 @@ import graphql.nadel.normalized.NormalizedQueryField
 import graphql.nadel.result.ResultComplexityAggregator
 import graphql.nadel.testutils.TestUtil
 import graphql.schema.GraphQLSchema
+import spock.lang.Ignore
 
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 
-import static graphql.language.AstPrinter.printAstCompact
 import static java.util.concurrent.CompletableFuture.completedFuture
 
 class NadelExecutionStrategyTest2 extends StrategyTestHelper {
@@ -39,7 +39,20 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     def serviceExecutionHooks = new ServiceExecutionHooks() {}
     def resultComplexityAggregator = new ResultComplexityAggregator()
 
+    String testName
+
+    void setup() {
+        TestDumper.reset()
+        testName = null
+    }
+
+    void cleanup() {
+        TestDumper.dump(testName)
+    }
+
     def "underlying service returns null for non-nullable field"() {
+        testName = TestDumper.getTestName()
+
         given:
         def overallSchema = TestUtil.schemaFromNdsl([Issues: '''
         service Issues {
@@ -88,6 +101,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "non-nullable field error bubbles up"() {
+        testName = TestDumper.getTestName()
+
         given:
         def overallSchema = TestUtil.schemaFromNdsl([Issues: '''
         service Issues {
@@ -137,6 +152,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "non-nullable field error in lists bubbles up to the top"() {
+        testName = TestDumper.getTestName()
+
         given:
         def overallSchema = TestUtil.schemaFromNdsl([Issues: '''
         service Issues {
@@ -184,6 +201,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "non-nullable field error in lists bubbles up"() {
+        testName = TestDumper.getTestName()
+
         given:
         def overallSchema = TestUtil.schemaFromNdsl([Issues: '''
         service Issues {
@@ -232,6 +251,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "a lot of renames"() {
+        testName = TestDumper.getTestName()
+
         given:
         def overallSchema = TestUtil.schemaFromNdsl([Boards: '''
         service Boards {
@@ -305,6 +326,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "fragment referenced twice from inside Query and inside another Fragment"() {
+        testName = TestDumper.getTestName()
+
         given:
         def overallSchema = TestUtil.schemaFromNdsl([Foo: '''
         service Foo {
@@ -353,6 +376,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
 
     def "synthetic hydration call with two argument values from original field arguments "() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -428,14 +453,14 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         def issue1Result = [id: "ISSUE-1", author: [name: "User 1"]]
@@ -449,6 +474,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "one synthetic hydration call with longer path and same named overall field"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -533,14 +560,14 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         def issue1Result = [id: "ISSUE-1", authorDetails: [[name: "User 1"], [name: "User 2"]], authors: [[id: "USER-1"], [id: "USER-2"]]]
@@ -556,6 +583,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
 
     def "one synthetic hydration call with longer path arguments and merged fields and renamed Type"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -634,14 +663,14 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         def issue1Result = [id: "ISSUE-1", authors: [[id: "USER-1", name: "User 1"], [id: "USER-2", name: "User 2"]]]
@@ -655,6 +684,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "Expecting one child Error on extensive field argument passed to synthetic hydration"() {
+        testName = TestDumper.getTestName()
+
         given:
         def boardSchema = TestUtil.schema("""
         type Query {
@@ -754,14 +785,14 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         resultData(response) == [board: [id: "1", cardChildren: [[assignee: [accountId: "1"]], [assignee: [accountId: "2"]], [assignee: [accountId: "3"]]]]]
@@ -772,6 +803,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
 
     def "extending types via hydration with arguments passed on"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -870,7 +903,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
     }
 
-    def 'hydration works when an ancestor field has been renamed'() {
+    def "hydration works when an ancestor field has been renamed"() {
+        testName = TestDumper.getTestName()
         // Note: this bug happens when the root field has been renamed, and then a hydration occurs further down the tree
         // i.e. here we rename relationships to devOpsRelationships and hydrate devOpsRelationships/nodes[0]/issue
 
@@ -951,13 +985,13 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         resultData(response) == [
@@ -971,7 +1005,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
         ]
     }
 
-    def 'able to ask for field and use same field as hydration source'() {
+    def "able to ask for field and use same field as hydration source"() {
+        testName = TestDumper.getTestName()
         // This was a bug where the nestedBar field would not be hydrated
         // because the hydration used $source.barId and because the query
         // also asked for barId
@@ -1053,13 +1088,13 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == topLevelQuery
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == topLevelQuery
         }) >> completedFuture(topLevelResult)
 
         2 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) in [hydrationQuery1, hydrationQuery2]
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) in [hydrationQuery1, hydrationQuery2]
         }) >> completedFuture(hydrationResult)
 
         resultData(response) == [
@@ -1077,6 +1112,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "extending types via hydration with variables arguments"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1178,6 +1215,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "extending types via hydration returning a connection"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1313,6 +1352,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
 
     def "query with three nested hydrations and simple data and lots of renames"() {
+        testName = TestDumper.getTestName()
+
 
         def nsdl = TestUtil.schemaFromNdsl([
                 Foo: '''
@@ -1467,6 +1508,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "hydration matching using index"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1548,6 +1591,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "hydration matching using index returning null"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1630,7 +1675,10 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
         errors.size() == 0
     }
 
+    @Ignore
     def "hydration matching using index result size invariant mismatch"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1710,6 +1758,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "hydration matching using index with lists"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1790,6 +1840,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "hydration matching using index with lists with hydration field not exposed"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1890,17 +1942,17 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
         def response1ServiceResult = new ServiceExecutionResult(responses[0])
         boolean calledService1 = false
         ServiceExecution service1Execution = { ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            assert printAstCompact(sep.query) == expectedQueries[0]
+            println TestDumper.printQueryCompact(sep.query)
+            assert TestDumper.printQueryCompact(sep.query) == expectedQueries[0]
             calledService1 = true
             return completedFuture(response1ServiceResult)
         }
 
         int calledService2Count = 0;
         ServiceExecution service2Execution = { ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
+            println TestDumper.printQueryCompact(sep.query)
             calledService2Count++
-            assert printAstCompact(sep.query) == expectedQueries[calledService2Count]
+            assert TestDumper.printQueryCompact(sep.query) == expectedQueries[calledService2Count]
             return completedFuture(new ServiceExecutionResult(responses[calledService2Count]))
         }
         def serviceDefinition = ServiceDefinition.newServiceDefinition().build()
@@ -1933,6 +1985,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
 
     def "renamed list inside renamed list"() {
+        testName = TestDumper.getTestName()
+
         given:
         def overallSchema = TestUtil.schemaFromNdsl([IssuesService: '''
          service IssuesService {
@@ -2010,7 +2064,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
 
-    def 'synthetic hydration works when an ancestor field has been renamed'() {
+    def "synthetic hydration works when an ancestor field has been renamed"() {
+        testName = TestDumper.getTestName()
 
         given:
         def issueSchema = TestUtil.schema("""
@@ -2094,13 +2149,13 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         resultData(response) == [
@@ -2118,6 +2173,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "top level field error is inserted with all information"() {
+        testName = TestDumper.getTestName()
+
         given:
         def underlyingSchema = TestUtil.schema("""
         type Query {
@@ -2125,7 +2182,7 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
         }
         """)
 
-        def overallSchema = TestUtil.schemaFromNdsl([service1 : """
+        def overallSchema = TestUtil.schemaFromNdsl([service1: """
         service service1 {
             type Query {
                 foo: String
@@ -2175,6 +2232,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
     }
 
     def "top level field error does not redact other top level fields"() {
+        testName = TestDumper.getTestName()
+
         given:
         def underlyingSchema = TestUtil.schema("""
         type Query {
@@ -2182,7 +2241,7 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
         }
         """)
 
-        def overallSchema = TestUtil.schemaFromNdsl([service1 :"""
+        def overallSchema = TestUtil.schemaFromNdsl([service1: """
         service service1 {
             type Query {
                 foo: String
@@ -2222,8 +2281,8 @@ class NadelExecutionStrategyTest2 extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         resultData(response) == [foo: null, bar: "boo"]

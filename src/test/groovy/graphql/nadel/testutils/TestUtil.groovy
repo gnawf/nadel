@@ -205,7 +205,14 @@ class TestUtil {
         }
     }
 
+    static Map<String, String> prevServiceDSLs
+
     static GraphQLSchema schemaFromNdsl(Map<String, String> serviceDSLs) {
+        if (prevServiceDSLs != null) {
+            throw new UnsupportedOperationException("Clear your test you monke")
+        }
+        prevServiceDSLs = serviceDSLs
+
         def defRegistries = []
         for (Map.Entry<String, String> e : serviceDSLs.entrySet()) {
             def serviceName = e.getKey()

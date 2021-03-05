@@ -4,6 +4,9 @@ import graphql.PublicApi;
 import graphql.nadel.dsl.ServiceDefinition;
 import graphql.schema.GraphQLSchema;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @PublicApi
 public class Service {
 
@@ -14,6 +17,7 @@ public class Service {
     private final ServiceDefinition serviceDefinition;
     private final DefinitionRegistry definitionRegistry;
 
+    public static final List<Service> services = new ArrayList<>();
 
     public Service(String name,
                    GraphQLSchema underlyingSchema,
@@ -25,6 +29,8 @@ public class Service {
         this.serviceExecution = serviceExecution;
         this.serviceDefinition = serviceDefinition;
         this.definitionRegistry = definitionRegistry;
+
+        services.add(this);
     }
 
     public String getName() {

@@ -29,8 +29,8 @@ import graphql.schema.idl.SchemaGenerator
 import graphql.schema.idl.SchemaParser
 
 import java.util.concurrent.CompletableFuture
+import java.util.function.Supplier
 
-import static graphql.language.AstPrinter.printAstCompact
 import static graphql.nadel.testutils.TestUtil.createNormalizedQuery
 import static graphql.nadel.testutils.TestUtil.parseQuery
 import static java.util.concurrent.CompletableFuture.completedFuture
@@ -45,6 +45,7 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     def instrumentation
     def serviceExecutionHooks
     def resultComplexityAggregator
+    String testName
 
     void setup() {
         executionHelper = new ExecutionHelper()
@@ -55,9 +56,18 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
         instrumentation = new NadelInstrumentation() {}
         serviceExecutionHooks = new ServiceExecutionHooks() {}
         resultComplexityAggregator = new ResultComplexityAggregator()
+
+        TestDumper.reset()
+        testName = null
+    }
+
+    void cleanup() {
+        TestDumper.dump(testName)
     }
 
     def "one call to one service"() {
+        testName = TestDumper.getTestName()
+
         given:
         def underlyingSchema = TestUtil.schema("""
         type Query {
@@ -65,7 +75,7 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
         }
         """)
 
-        def overallSchema = TestUtil.schemaFromNdsl([service1:"""
+        def overallSchema = TestUtil.schemaFromNdsl([service1: """
         service service1 {
             type Query {
                 foo: String
@@ -89,7 +99,7 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({
-            printAstCompact(it.query) == expectedQuery
+            TestDumper.printQueryCompact(it.query) == expectedQuery
         } as ServiceExecutionParameters) >> completedFuture(new ServiceExecutionResult(null))
 
         // Zero total and service node count as execution skipped.
@@ -100,6 +110,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "one call to one service with list result"() {
+        testName = TestDumper.getTestName()
+
         given:
         def underlyingSchema = TestUtil.schema("""
         type Query {
@@ -107,7 +119,7 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
         }
         """)
 
-        def overallSchema = TestUtil.schemaFromNdsl([service1:"""
+        def overallSchema = TestUtil.schemaFromNdsl([service1: """
         service service1 {
             type Query {
                 foo: [String]
@@ -133,7 +145,7 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({
-            printAstCompact(it.query) == expectedQuery
+            TestDumper.printQueryCompact(it.query) == expectedQuery
         } as ServiceExecutionParameters) >> completedFuture(new ServiceExecutionResult(serviceResultData))
         resultData(response) == [foo: ["foo1", "foo2"]]
     }
@@ -163,8 +175,11 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
         }
         """)
 
-    def overallHydrationSchema = TestUtil.schemaFromNdsl([
-            service1: '''
+    def overallHydrationSchema = new Supplier<GraphQLSchema>() {
+        @Override
+        GraphQLSchema get() {
+            TestUtil.schemaFromNdsl([
+                    service1: '''
         service service1 {
             type Query {
                 foo(id : ID): Foo
@@ -176,7 +191,7 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
             }
         }
         ''',
-            service2: '''
+                    service2: '''
         service service2 {
 
             type Query {
@@ -188,9 +203,15 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
             }
         }
         '''])
+        }
+    }
 
 
     def "one hydration call with variables defined"() {
+        testName = TestDumper.getTestName()
+
+        def overallHydrationSchema = overallHydrationSchema.get()
+
         given:
         def hydrationService1 = new Service("service1", underlyingHydrationSchema1, service1Execution, serviceDefinition, definitionRegistry)
         def hydrationService2 = new Service("service2", underlyingHydrationSchema2, service2Execution, serviceDefinition, definitionRegistry)
@@ -216,12 +237,12 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({
-            printAstCompact(it.query) == expectedQuery1
+            TestDumper.printQueryCompact(it.query) == expectedQuery1
         } as ServiceExecutionParameters) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({
-            printAstCompact(it.query) == expectedQuery2
+            TestDumper.printQueryCompact(it.query) == expectedQuery2
         } as ServiceExecutionParameters) >> completedFuture(response2)
 
         resultData(response) == [foo: [bar: [id: "barId", name: "Bar1"]]]
@@ -234,6 +255,10 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
 
     def "one hydration call with fragments defined"() {
+        testName = TestDumper.getTestName()
+
+        def overallHydrationSchema = overallHydrationSchema.get()
+
         given:
         def hydrationService1 = new Service("service1", underlyingHydrationSchema1, service1Execution, serviceDefinition, definitionRegistry)
         def hydrationService2 = new Service("service2", underlyingHydrationSchema2, service2Execution, serviceDefinition, definitionRegistry)
@@ -268,12 +293,12 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery1
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery2
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         resultData(response) == [foo: [bar: [id: "barId", name: "Bar1"]]]
@@ -285,6 +310,10 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "basic hydration"() {
+        testName = TestDumper.getTestName()
+
+        def overallHydrationSchema = overallHydrationSchema.get()
+
         given:
         def hydrationService1 = new Service("service1", underlyingHydrationSchema1, service1Execution, serviceDefinition, definitionRegistry)
         def hydrationService2 = new Service("service2", underlyingHydrationSchema2, service2Execution, serviceDefinition, definitionRegistry)
@@ -311,12 +340,12 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery1
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery2
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         resultData(response) == [foo: [bar: [name: "Bar1"]]]
@@ -328,6 +357,10 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "one hydration call with input value having longer path"() {
+        testName = TestDumper.getTestName()
+
+        def overallHydrationSchema = overallHydrationSchema.get()
+
         given:
         def hydrationService1 = new Service("service1", underlyingHydrationSchema1, service1Execution, serviceDefinition, definitionRegistry)
         def hydrationService2 = new Service("service2", underlyingHydrationSchema2, service2Execution, serviceDefinition, definitionRegistry)
@@ -353,12 +386,12 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery1
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery2
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         resultData(response) == [foo: [barLongerInput: [name: "Bar1"]]]
@@ -371,6 +404,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
 
     def "one hydration call with longer path and same named overall field"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -450,14 +485,14 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         def issue1Result = [id: "ISSUE-1", authorDetails: [[name: "User 1"], [name: "User 2"]], authors: [[id: "USER-1"], [id: "USER-2"]]]
@@ -472,6 +507,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "one hydration call with longer path arguments and merged fields"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -545,14 +582,14 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         def issue1Result = [id: "ISSUE-1", authors: [[id: "USER-1", name: "User 1"], [id: "USER-2", name: "User 2"]]]
@@ -567,6 +604,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "batching of hydration list"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -639,15 +678,15 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery1
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery2
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery3
+            TestDumper.printQueryCompact(sep.query) == expectedQuery3
         }) >> completedFuture(response3)
 
 
@@ -664,6 +703,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "batching of hydration list with flattened arguments"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -741,18 +782,18 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery3
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery3
         }) >> completedFuture(response3)
 
 
@@ -770,6 +811,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
 
     def "hydration list"() {
+        testName = TestDumper.getTestName()
+
         given:
         def underlyingSchema1 = TestUtil.schema("""
         type Query {
@@ -842,18 +885,18 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery1
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery2
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery3
+            TestDumper.printQueryCompact(sep.query) == expectedQuery3
         }) >> completedFuture(response3)
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery4
+            TestDumper.printQueryCompact(sep.query) == expectedQuery4
         }) >> completedFuture(response4)
 
         resultData(response) == [foo: [bar: [[id: "barId1", name: "Bar1"], [id: "barId2", name: "Bar3"], [id: "barId3", name: "Bar4"]]]]
@@ -865,6 +908,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "rename with first path element returning null"() {
+        testName = TestDumper.getTestName()
+
 
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -905,8 +950,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         resultData(response) == [issue: [name: null]]
@@ -917,6 +962,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "rename with first last path element returning null"() {
+        testName = TestDumper.getTestName()
+
 
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -957,8 +1004,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         resultData(response) == [issue: [name: null]]
@@ -969,6 +1016,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "hydration list with batching"() {
+        testName = TestDumper.getTestName()
+
         given:
         def underlyingSchema1 = TestUtil.schema("""
         type Query {
@@ -1035,13 +1084,13 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery1
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
             !sep.hydrationCall
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery2
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
             sep.hydrationCall
         }) >> completedFuture(response2)
 
@@ -1054,6 +1103,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "hydration batching returns null"() {
+        testName = TestDumper.getTestName()
+
         given:
         def underlyingSchema1 = TestUtil.schema("""
         type Query {
@@ -1120,12 +1171,12 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery1
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery2
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         resultData(response) == [foo: [bar: [null, null, null]]]
@@ -1136,6 +1187,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "hydration list with one element"() {
+        testName = TestDumper.getTestName()
+
         given:
         def underlyingSchema1 = TestUtil.schema("""
         type Query {
@@ -1202,12 +1255,12 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery1
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery2
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         resultData(response) == [foo: [bar: [[id: "barId1", name: "Bar1"]]]]
@@ -1227,7 +1280,14 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
         createExecutionData(query, [:], overallSchema)
     }
 
+    static String incomingQuery
+
     ExecutionHelper.ExecutionData createExecutionData(String query, Map<String, Object> variables, GraphQLSchema overallSchema) {
+        if (incomingQuery != null) {
+            throw new IllegalStateException("clear your test state you monke")
+        }
+        incomingQuery = query
+
         def document = parseQuery(query)
         def normalizedQuery = createNormalizedQuery(overallSchema, document)
 
@@ -1254,6 +1314,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "two deep renames"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1304,8 +1366,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         def issue1Result = [id: "ISSUE-1", authorId: "USER-1", authorName: "User 1"]
@@ -1319,6 +1381,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "two deep renames, merged fields with same path and field rename"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1373,8 +1437,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         def issue1Result = [id: "ISSUE-1", authorId: "USER-1", authorName: "User 1", details: [extra: "extra 1"]]
@@ -1387,6 +1451,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "deep rename of an object"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1443,8 +1509,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         def issue1Result = [id: "ISSUE-1", authorName: [firstName: "George", lastName: "Smith"]]
@@ -1457,6 +1523,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "deep rename of list"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1502,8 +1570,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         def detail1Result = [labels: ["label1", "label2"]]
@@ -1515,6 +1583,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "deep rename of list of list"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1560,8 +1630,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         def detail1Result = [labels: [["label1", "label2"], ["label3"]]]
@@ -1573,6 +1643,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "deep rename of an object with transformations inside object"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1628,8 +1700,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         def issue1Result = [id: "ISSUE-1", authorName: [firstName: "George", lastName: "Smith"]]
@@ -1642,6 +1714,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "hydration call with argument value from original field argument "() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1711,14 +1785,14 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         def issue1Result = [id: "ISSUE-1", author: [name: "User 1"]]
@@ -1731,6 +1805,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "hydration call with two argument values from original field arguments "() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1800,14 +1876,14 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         def issue1Result = [id: "ISSUE-1", author: [name: "User 1"]]
@@ -1821,6 +1897,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "call with variables inside input objects"() {
+        testName = TestDumper.getTestName()
+
         given:
         def serviceSchema = TestUtil.schema("""
         type Query {
@@ -1861,8 +1939,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
 
@@ -1875,6 +1953,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "two top level fields with a fragment"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -1956,14 +2036,14 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         resultData(response) == [issues: [issue1, issue2], user: user]
@@ -1978,6 +2058,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "hydration call with fragments in the hydrated part"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -2079,21 +2161,21 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery3
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery3
         }) >> completedFuture(response3)
 
         def issue1Result = [id: "ISSUE-1", authors: [[id: "USER-1", name: "User 1"], [id: "USER-2", name: "User 2"]]]
@@ -2110,6 +2192,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "deep rename inside another rename of type List"() {
+        testName = TestDumper.getTestName()
+
 
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -2179,8 +2263,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         resultData(response) == [boardScope: [board: [cardChildren: [[id: "1234", key: "abc", summary: "Summary 1"], [id: "456", key: "def", summary: "Summary 2"]]]]]
@@ -2193,6 +2277,8 @@ class NadelExecutionStrategyTest extends StrategyTestHelper {
     }
 
     def "hydration call over itself with renamed types"() {
+        testName = TestDumper.getTestName()
+
         given:
         def testingSchema = TestUtil.schema("""
         type Query {
@@ -2285,19 +2371,19 @@ fragment F1 on TestingCharacter {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery3
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery3
         }) >> completedFuture(response3)
 
         def result = [movies: [[id: "M1", name: "Movie 1", characters: [[id: "C1", name: "Luke"], [id: "C2", name: "Leia"]]], [id: "M2", name: "Movie 2", characters: [[id: "C1", name: "Luke"], [id: "C2", name: "Leia"], [id: "C3", name: "Anakin"]]]]]
@@ -2309,6 +2395,8 @@ fragment F1 on TestingCharacter {
     }
 
     def "hydration input is empty list"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -2374,8 +2462,8 @@ fragment F1 on TestingCharacter {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         def issue1Result = [id: "ISSUE-1", authors: []]
@@ -2389,6 +2477,8 @@ fragment F1 on TestingCharacter {
     }
 
     def "hydration input is null"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -2454,8 +2544,8 @@ fragment F1 on TestingCharacter {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         def issue1Result = [id: "ISSUE-1", authors: null]
@@ -2469,6 +2559,8 @@ fragment F1 on TestingCharacter {
     }
 
     def "batching with default batch size"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = TestUtil.schema("""
         type Query {
@@ -2542,15 +2634,15 @@ fragment F1 on TestingCharacter {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery1
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery2
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery3
+            TestDumper.printQueryCompact(sep.query) == expectedQuery3
         }) >> completedFuture(response3)
 
 
@@ -2576,6 +2668,8 @@ fragment F1 on TestingCharacter {
     }
 
     def "__typename is correctly passed on and artificial typename is removed"() {
+        testName = TestDumper.getTestName()
+
         given:
         def issueSchema = underlyingSchema("""
         type Query {
@@ -2622,10 +2716,9 @@ fragment F1 on TestingCharacter {
         def response = nadelExecutionStrategy.execute(executionData.executionContext, executionHelper.getFieldSubSelection(executionData.executionContext), resultComplexityAggregator)
 
         then:
-        then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         def issue1Result = [id: "ISSUE-1", authorIds: ["USER-1", "USER-2"], __typename: "Issue"]
@@ -2639,6 +2732,8 @@ fragment F1 on TestingCharacter {
     }
 
     def "hydration call forwards error"() {
+        testName = TestDumper.getTestName()
+
         given:
         def underlyingSchema1 = TestUtil.schema("""
         type Query {
@@ -2704,12 +2799,12 @@ fragment F1 on TestingCharacter {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery1
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery2
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         def errors = resultErrors(response)
@@ -2726,6 +2821,8 @@ fragment F1 on TestingCharacter {
 
 
     def "hydration list with batching forwards error"() {
+        testName = TestDumper.getTestName()
+
         given:
         def underlyingSchema1 = TestUtil.schema("""
         type Query {
@@ -2791,12 +2888,12 @@ fragment F1 on TestingCharacter {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery1
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery2
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
         def errors = resultErrors(response)
@@ -2810,6 +2907,8 @@ fragment F1 on TestingCharacter {
     }
 
     def "hydration inside a renamed field"() {
+        testName = TestDumper.getTestName()
+
         given:
         def underlyingFooSchema = TestUtil.schema("""
             type Query {
@@ -2882,11 +2981,11 @@ fragment F1 on TestingCharacter {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery1
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(delegatedExecutionResult1)
         // The {service2Execution} service is not hit if hydration doesn't go through
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            printAstCompact(sep.query) == expectedQuery2
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(delegatedExecutionResult2)
 
         resultData(response) == [
@@ -2906,6 +3005,8 @@ fragment F1 on TestingCharacter {
     }
 
     def "Expecting one child Error on extensive field argument passed to hydration"() {
+        testName = TestDumper.getTestName()
+
         given:
         def boardSchema = TestUtil.schema("""
         type Query {
@@ -2981,7 +3082,7 @@ fragment F1 on TestingCharacter {
                         }'''
 
         def expectedQuery1 = "query nadel_2_TestBoard {board(id:1) {id issueChildren {id issue {assignee {accountId}}}}}"
-        def data1 = [board: [id: "1", issueChildren: [[id:"a1", issue: [assignee: [accountId: "1"]]], [id:"a2", issue: [assignee: [accountId: "2"]]], [id:"a3", issue: [assignee: [accountId: "3"]]]]]]
+        def data1 = [board: [id: "1", issueChildren: [[id: "a1", issue: [assignee: [accountId: "1"]]], [id: "a2", issue: [assignee: [accountId: "2"]]], [id: "a3", issue: [assignee: [accountId: "3"]]]]]]
         def response1 = new ServiceExecutionResult(data1)
 
         def expectedQuery2 = "query nadel_2_Users {users(accountIds:[\"1\",\"2\",\"3\"]) {accountId object_identifier__UUID:accountId}}"
@@ -3000,17 +3101,17 @@ fragment F1 on TestingCharacter {
 
         then:
         1 * service1Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery1
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery1
         }) >> completedFuture(response1)
 
         then:
         1 * service2Execution.execute({ ServiceExecutionParameters sep ->
-            println printAstCompact(sep.query)
-            printAstCompact(sep.query) == expectedQuery2
+            println TestDumper.printQueryCompact(sep.query)
+            TestDumper.printQueryCompact(sep.query) == expectedQuery2
         }) >> completedFuture(response2)
 
-        resultData(response) == [board: [id: "1", cardChildren: [ [id:"a1",assignee: [accountId: "1"]], [id:"a2", assignee: [accountId: "2"]], [id:"a3", assignee: [accountId: "3"]]]]]
+        resultData(response) == [board: [id: "1", cardChildren: [[id: "a1", assignee: [accountId: "1"]], [id: "a2", assignee: [accountId: "2"]], [id: "a3", assignee: [accountId: "3"]]]]]
         resultComplexityAggregator.getFieldRenamesCount() == 1
         resultComplexityAggregator.getTypeRenamesCount() == 2
     }

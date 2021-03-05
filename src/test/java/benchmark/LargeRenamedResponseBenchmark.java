@@ -1,6 +1,6 @@
 package benchmark;
 
-
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Charsets;
 import com.google.common.io.Resources;
@@ -34,14 +34,12 @@ import java.util.concurrent.TimeUnit;
 /**
  * See http://hg.openjdk.java.net/code-tools/jmh/file/tip/jmh-samples/src/main/java/org/openjdk/jmh/samples/ for more samples
  * on what you can do with JMH
- *
+ * <p>
  * You MUST have the JMH plugin for IDEA in place for this to work :  https://github.com/artyushov/idea-jmh-plugin
- *
+ * <p>
  * Install it and then just hit "Run" on a certain benchmark method
  */
-
 public class LargeRenamedResponseBenchmark {
-
 
     @State(Scope.Benchmark)
     public static class NadelInstance {
@@ -80,22 +78,20 @@ public class LargeRenamedResponseBenchmark {
         }
     }
 
-
     @Benchmark
     @Warmup(iterations = 2)
     @Measurement(iterations = 3, time = 10)
     @Threads(1)
     @BenchmarkMode(Mode.AverageTime)
     @OutputTimeUnit(TimeUnit.MILLISECONDS)
-    public ExecutionResult benchMarkAvgTime(NadelInstance nadelInstance) throws ExecutionException, InterruptedException {
+    public ExecutionResult benchMarkAvgTime(NadelInstance nadelInstance) throws ExecutionException, InterruptedException, JsonProcessingException {
         NadelExecutionInput nadelExecutionInput = NadelExecutionInput.newNadelExecutionInput()
                 .query(nadelInstance.query)
                 .build();
         ExecutionResult executionResult = nadelInstance.nadel.execute(nadelExecutionInput).get();
         Assert.assertTrue(executionResult.getErrors().size() == 0);
 //        System.out.println("data:" +executionResult.getData());
+        System.out.println(new ObjectMapper().writeValueAsString(executionResult.toSpecification()));
         return executionResult;
     }
-
-
 }

@@ -1,5 +1,6 @@
 package graphql.nadel.engine;
 
+import graphql.ExecutionResult;
 import graphql.GraphQLError;
 import graphql.Internal;
 import graphql.execution.Async;
@@ -25,6 +26,7 @@ import graphql.nadel.normalized.NormalizedQueryField;
 import graphql.nadel.normalized.NormalizedQueryFromAst;
 import graphql.nadel.result.ExecutionResultNode;
 import graphql.nadel.result.ResultComplexityAggregator;
+import graphql.nadel.result.ResultNodesUtil;
 import graphql.nadel.result.RootExecutionResultNode;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLSchema;
@@ -65,11 +67,19 @@ public class NadelExecutionStrategy {
 
     private static final Logger log = LoggerFactory.getLogger(NadelExecutionStrategy.class);
 
+    public static GraphQLSchema lastOverallSchema;
+
     public NadelExecutionStrategy(List<Service> services,
                                   FieldInfos fieldInfos,
                                   GraphQLSchema overallSchema,
                                   NadelInstrumentation instrumentation,
                                   ServiceExecutionHooks serviceExecutionHooks) {
+        if (lastOverallSchema != null) {
+            throw new IllegalStateException("Delete your test dump data!");
+        } else {
+            lastOverallSchema = overallSchema;
+        }
+
         this.overallSchema = overallSchema;
         assertNotEmpty(services);
         this.fieldInfos = fieldInfos;
@@ -78,6 +88,8 @@ public class NadelExecutionStrategy {
         this.hydrationInputPaths = new ExecutionPathSet();
         this.hydrationInputResolver = new HydrationInputResolver(services, overallSchema, serviceExecutor, serviceExecutionHooks, hydrationInputPaths);
     }
+
+    public static ExecutionResult lastResp;
 
     public CompletableFuture<RootExecutionResultNode> execute(ExecutionContext executionContext, FieldSubSelection fieldSubSelection, ResultComplexityAggregator resultComplexityAggregator) {
         long startTime = System.currentTimeMillis();
@@ -104,7 +116,13 @@ public class NadelExecutionStrategy {
                         long elapsedTime = System.currentTimeMillis() - startTime;
                         log.debug("NadelExecutionStrategy time: {} ms, executionId: {}", elapsedTime, executionContext.getExecutionId());
                     });
-        }).whenComplete(this::possiblyLogException);
+        }).whenComplete(this::possiblyLogException)
+                .whenComplete((RootExecutionResultNode result, Throwable exception) -> {
+                    if (lastResp != null) {
+                        throw new UnsupportedOperationException("Clean up the tests you monke");
+                    }
+                    lastResp = ResultNodesUtil.toExecutionResult(result);
+                });
     }
 
     private Map<Service, Object> serviceContextsByService(List<OneServiceExecution> oneServiceExecutions) {
@@ -329,7 +347,6 @@ public class NadelExecutionStrategy {
             return super.add(executionPath);
         }
     }
-
 
     private Service getServiceForFieldDefinition(GraphQLFieldDefinition fieldDefinition) {
         FieldInfo info = assertNotNull(fieldInfos.getInfo(fieldDefinition), () -> String.format("no field info for field %s", fieldDefinition.getName()));
