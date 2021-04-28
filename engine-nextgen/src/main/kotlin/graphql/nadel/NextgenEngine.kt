@@ -30,7 +30,7 @@ import java.util.concurrent.CompletableFuture
 class NextgenEngine(nadel: Nadel) : NadelExecutionEngine {
     private val overallSchema = nadel.overallSchema
     private val fieldInfos = GraphQLFieldInfos(nadel.overallSchema, nadel.services)
-    private val executionBlueprint = GraphQLExecutionBlueprintFactory.create(overallSchema)
+    private val executionBlueprint = GraphQLExecutionBlueprintFactory.create(overallSchema, nadel.services)
     private val executionPlanner = GraphQLExecutionPlanner.create(executionBlueprint, nadel.overallSchema)
     private val queryTransformer = GraphQLQueryTransformer.create(nadel.overallSchema)
     private val instrumentation = nadel.instrumentation
